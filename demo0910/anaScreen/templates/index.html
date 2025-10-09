@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Totem</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Vital Signs</h1>
+    <div id="data-container">
+        <p>Temperature: <span id="objectTemp">--</span> °C</p>
+    </div>
+    <div id="error-container" class="error" style="display:none;"></div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>
