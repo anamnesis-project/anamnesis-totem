@@ -152,10 +152,9 @@ byte readLED = 13; //Blinks with each data read
 void setup()
 {
     Serial.begin(115200); // initialize serial communication at 115200 bits per second:
-
-    pinMode(pulseLED, OUTPUT);
-    pinMode(readLED, OUTPUT);
-
+    Wire.begin(21, 22);
+    //pinMode(pulseLED, OUTPUT);
+    //pinMode(readLED, OUTPUT);
     // Initialize sensor
     if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) //Use default I2C port, 400kHz speed
     {
