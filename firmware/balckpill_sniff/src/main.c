@@ -2,6 +2,37 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+
+void SystemClock_Config(void) {
+    // 1) Habilita HSE
+    RCC->CR |= RCC_CR_HSEON;
+    while (!(RCC->CR & RCC_CR_HSERDY));
+
+    // 2) Configura o PLL
+    RCC->PLLCFGR = (25 << RCC_PLLCFGR_PLLM_Pos)   // PLL_M = 25
+                 | (200 << RCC_PLLCFGR_PLLN_Pos)  // PLL_N = 200
+                 | (0 << RCC_PLLCFGR_PLLP_Pos)    // PLL_P = 2 (00b)
+                 | (RCC_PLLCFGR_PLLSRC_HSE)       // fonte PLL = HSE
+                 | (4 << RCC_PLLCFGR_PLLQ_Pos);   // PLL_Q = 4
+
+    // 3) Liga o PLL
+    RCC->CR |= RCC_CR_PLLON;
+    while (!(RCC->CR & RCC_CR_PLLRDY));
+
+    // 4) Configura prescalers AHB e APB
+    RCC->CFGR |= RCC_CFGR_HPRE_DIV1     // AHB = /1 → 100 MHz
+               | RCC_CFGR_PPRE1_DIV2    // APB1 = /2 → 50 MHz (máx 50 MHz)
+               | RCC_CFGR_PPRE2_DIV1;   // APB2 = /1 → 100 MHz
+
+    // 5) Seleciona PLL como clock do sistema
+    RCC->CFGR &= ~RCC_CFGR_SW;
+    RCC->CFGR |= RCC_CFGR_SW_PLL;
+    while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL);
+
+    NVIC_SetPriority(SysTick_IRQn, 15);   // mais baixa
+    // 6) Atualiza SystemCoreClock
+    SystemCoreClockUpdate();
+}
 /* ====================== UART1 (PA9=TX, PA10=RX) ====================== */
 void uart1_init(void) {
     // Clock GPIOA + USART1
@@ -21,8 +52,10 @@ void uart1_init(void) {
     GPIOA->AFR[1] |=  (7 << ((10 - 8) * 4));
 
     // Baudrate ~115200 com APB2=84MHz
-    USART1->BRR = 0x8B;  
-
+    //USART1->BRR = 0x8B; 
+    // Calcular BRR baseado em SystemCoreClock (APB2 = 100MHz) 
+    uint32_t baud = 115200;
+    USART1->BRR = SystemCoreClock / baud;
     USART1->CR1 = USART_CR1_TE | USART_CR1_RE | USART_CR1_UE;
 }
 
@@ -45,10 +78,10 @@ typedef enum {
 typedef struct {
     EventType type;
     uint8_t sda;
-    uint32_t ts;
 } Event;
 
-#define BUF_SIZE 256
+#define BUF_SIZE 512         // potência de dois
+#define BUF_MASK (BUF_SIZE-1)
 volatile Event evbuf[BUF_SIZE];
 volatile uint16_t ev_head = 0, ev_tail = 0;
 
@@ -59,14 +92,13 @@ static inline void pushEvent(EventType t, uint8_t sda) {
     }
     evbuf[ev_head].type = t;
     evbuf[ev_head].sda = sda;
-    evbuf[ev_head].ts = SysTick->VAL; // timestamp aproximado
     ev_head = next;
 }
 
 bool popEvent(Event *out) {
     if (ev_tail == ev_head) return false;
     *out = evbuf[ev_tail];
-    ev_tail = (ev_tail + 1) % BUF_SIZE;
+    ev_tail = (ev_tail + 1) & BUF_MASK;
     return true;
 }
 
@@ -98,6 +130,7 @@ void i2c_sniffer_init(void) {
     EXTI->RTSR |= (1 << PIN_SDA);
     EXTI->FTSR |= (1 << PIN_SDA);
 
+    NVIC_SetPriority(EXTI9_5_IRQn, 0);
     // NVIC
     NVIC_EnableIRQ(EXTI9_5_IRQn);
     NVIC_EnableIRQ(EXTI15_10_IRQn);
@@ -171,6 +204,9 @@ void processEvent(const Event *ev) {
 
 /* ====================== main ====================== */
 int main(void) {
+    SystemInit();          // inicialização padrão CMSIS
+    SystemClock_Config();  // ajusta o PLL para 100 MHz
+
     uart1_init();
     uart1_print("\r\n=== I2C Sniffer Blackpill (USART1 A9/A10) ===\r\n");
 
