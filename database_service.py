@@ -5,13 +5,11 @@ import asyncio.subprocess
 
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
-TOPIC_SPEAK = "voice/speak/request" 
-SPEAK_RESPONSE = "voice/speak/response"
-# MQTT topic to listen for text
-WEBSOCKET_URI = "ws://localhost:8000/ws/tts" # TTS SERVER WebSocket URI
-AUDIO_FILENAME = "speak.wav" # temporary file
+TOPIC_DB_REQUEST = "db/request" 
+TOPIC_DB_RESPONSE = "db/response"
+DB_SERVER_URI = "http://localhost:8000/" # DB SERVER
 
-SPEAKER_SUCCESS_PAYLOAD = 'ok'
+DB_SUCCESS_PAYLOAD = 'ok'
 
 async def tts_via_websocket(text: str, filename: str):
     """
@@ -80,8 +78,8 @@ async def main():
             print(f"Conected to MQTT Broker at {MQTT_BROKER}.")
             
             # subscribe to listen topic
-            await client.subscribe(TOPIC_SPEAK)
-            print(f"Listening MQTT topic: '{TOPIC_SPEAK}'")
+            await client.subscribe(TOPIC_DB_REQUEST)
+            print(f"Listening MQTT topic: '{TOPIC_DB_REQUEST}'")
             print("Waiting for text messages...")
             
             async for message in client.messages:
@@ -95,7 +93,7 @@ async def main():
                     # Play audio
                     if success_tts:
                         await play_audio_file(AUDIO_FILENAME)
-                        client.publish(SPEAK_RESPONSE, SPEAKER_SUCCESS_PAYLOAD)
+                        client.publish(TOPIC_DB_RESPONSE, DB_SUCCESS_PAYLOAD)
                     else:
                         print("Failed playing audio from TTS server.")
                     

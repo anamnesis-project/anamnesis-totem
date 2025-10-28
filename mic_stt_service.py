@@ -8,8 +8,8 @@ logging.basicConfig(level=logging.INFO)
 
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
-TOPIC_START = "voice/mic_stt/start"
-TOPIC_STOP = "voice/mic_stt/stop"
+MIC_START = "voice/mic_stt/start"
+MIC_STOP = "voice/mic_stt/stop"
 TOPIC_TRANSCRIPTION = "voice/mic_stt/transcription" # Para onde vai o texto final
 
 WEBSOCKET_URI = "ws://192.168.18.47:8000/ws/stt"
@@ -105,20 +105,20 @@ async def stt_session_manager(mqtt_client, stt_active_event):
             stt_active_event.clear()
 
 async def handle_mqtt_commands(client, stt_active_event):
-    logging.info(f"Listening topics: '{TOPIC_START}' and '{TOPIC_STOP}'")
+    logging.info(f"Listening topics: '{MIC_START}' and '{MIC_STOP}'")
     try:
-        await client.subscribe(TOPIC_START)
-        await client.subscribe(TOPIC_STOP)
+        await client.subscribe(MIC_START)
+        await client.subscribe(MIC_STOP)
         
         async for message in client.messages:
-            if message.topic.matches(TOPIC_START):
+            if message.topic.matches(MIC_START):
                 if not stt_active_event.is_set():
                     logging.info("'start' command received. Activating STT.")
                     stt_active_event.set()
                 else:
                     logging.warning("'start' command received but STT already on.")
                     
-            elif message.topic.matches(TOPIC_STOP):
+            elif message.topic.matches(MIC_STOP):
                 if stt_active_event.is_set():
                     logging.info("stop' command received. Deactivating STT.")
                     # Limpa o evento, o que fará as tarefas 'send/receive' pararem
