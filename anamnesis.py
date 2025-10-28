@@ -45,7 +45,9 @@ Answer: I am an industrial engineering student.
 main_state = 0
 forms_state = 0
 forms_flow_state = 0
+measures_state = 0
 
+jsonPost = {}
 class Forms(Enum):
     AGE = (0, "How old are you?")
     SEX = (1, "What is your biological sex?")
@@ -62,7 +64,11 @@ class Forms(Enum):
     def question(self):
         return self.value[1]
 
-# --- Definição dos Estados da Máquina ---
+class Measures(Enum):
+    TEMPERATURE = 0
+    OXYMETER = 1
+    PRESSURE = 2
+
 class State(Enum):
     FORMS = 0
     MEASURES = 1
@@ -90,54 +96,20 @@ async def main():
                     continue
 
                 if main_state == State.FORMS:
-                    (
-                        new_main_state, 
-                        new_sub_state, 
-                        new_form_index
-                    ) = await run_forms_flow(client, message, payload)
+                    await run_forms_flow(client, message, payload)
+                    if main_state == State.MEASURES:
+                        await client.publish(FW_INPUT, str(measures_state))
                     
-                    # Verifica se houve uma transição de ESTADO PRINCIPAL
-                    if new_main_state != current_state:
-                        log.info(f"[TRANSIÇÃO] Mudando de {current_state.name} para {new_main_state.name}")
-                        
-                        # Dispara a primeira ação do NOVO estado
-                        if new_main_state == MainState.MEASURES:
-                            log.info(f"[ESTADO: {new_main_state.name}] Iniciando fluxo.")
-                            # Ex: await start_measures_flow(client)
-                        
-                        elif new_main_state == MainState.INTERVIEW:
-                            # ...
-                            pass
-                    
-                    # Atualiza os estados para a próxima iteração do loop
-                    current_state = new_main_state
-                    current_sub_state = new_sub_state
-                    current_form_index = new_form_index
+                elif main_state == State.MEASURES:
+                    await run_measures_flow(client, message, payload)
 
-                elif current_state == MainState.MEASURES:
-                    log.info(f"[ESTADO: {current_state.name}] (Lógica não implementada)")
-                    # (new_main_state, ...) = await run_measures_flow(...)
-                    # current_state = new_main_state
-                
-                elif current_state == MainState.INTERVIEW:
-                    log.info(f"[ESTADO: {current_state.name}] (Lógica não implementada)")
-                    # ...
-
-                if current_state == MainState.COMPLETED:
-                    log.info("Todos os fluxos concluídos. Encerrando.")
-                    break # Sai do loop 'async for'
+                elif main_state == State.INTERVIEW:
+                    await run_interview_flow(client, message, payload)
 
     except mqtt.MqttError as e:
         log.critical(f"Erro crítico de MQTT: {e}. Encerrando.")
     except KeyboardInterrupt:
         log.info("Orquestrador encerrado pelo usuário.")
-
-# --- Ponto de Entrada do Script ---
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        log.info("Programa interrompido.")
 
 async def run_forms_flow(client, message, payload):
     if message.topic.matches(SPEAK_RESPONSE):
@@ -149,7 +121,7 @@ async def run_forms_flow(client, message, payload):
             
     elif message.topic.matches(TOPIC_TRANSCRIPTION):
         if payload != STT_FAIL_PAYLOAD:
-            log.warning(f"Mic_stt_service falhou: '{payload}'")
+            log.warning(f"Mic_stt_service failed: '{payload}'")
             return False #???
         content = build_llm_prompt(payload, State.FORMS)
         await client.publish(TOPIC_PROMPT, content)
@@ -159,37 +131,34 @@ async def run_forms_flow(client, message, payload):
         if payload != LLM_FAIL_PAYLOAD:
             log.warning(f"Gemini_service failed: '{payload}'")
             return False #???
-        insert_db(client, payload, main_state, forms_state) #TODO 
-
-    elif message.topic.matches(TOPIC_DB_RESPONSE):
-        if payload != DB_FAIL_PAYLOAD:
-            log.warnning("DB_service failed")
-            return False #???
+        jsonPost[Forms(forms_state)] = message
         forms_state += 1
-        if forms_state > 5:
+        if forms_state > 5: #DISEASES
             main_state += 1
         else:
             question = Forms(forms_state).question
             await client.publish(TOPIC_SPEAK, question)
         return True #???
 
+def run_measures_flow(client, message, payload):
+    if message.topic.matches(FW_OUTPUT):
+        if payload == FW_FAIL_PAYLOAD:
+            log.warning(f"Firmware_service failed: '{payload}'")
+            return False #???
+        #processes_fw_output(payload)
+
+#def run_interview_flow(client, message, payload):
+
 def build_llm_prompt(message, status):
     if status == State.FORMS:
         question = Forms(forms_state).question
         prompt = (process_answer_context + question + '\nAnswer:\n' + message + '\nOutput:')
         return prompt
-    
-def insert_db(client, information, main_state, forms_state=None):
-    if main_state == State.FORMS:
-        json = {
-            
-        }
 
-# --- Ponto de Entrada do Script ---
+#def insert_db(client, information, payload):
+
 if __name__ == "__main__":
-    # Remove a variável 'state' global, pois a lógica agora
-    # está encapsulada dentro da função 'main'
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        log.info("Programa interrompido.")
+        log.info("Program interrupted")
