@@ -95,7 +95,7 @@ async def main():
                     # Play audio
                     if success_tts:
                         await play_audio_file(AUDIO_FILENAME)
-                        client.publish(SPEAK_RESPONSE, SPEAKER_SUCCESS_PAYLOAD)
+                        await client.publish(SPEAK_RESPONSE, SPEAKER_SUCCESS_PAYLOAD)
                     else:
                         print("Failed playing audio from TTS server.")
                     

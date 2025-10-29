@@ -27,27 +27,15 @@ TOPIC_DB_REQUEST = "db/request"
 TOPIC_DB_RESPONSE = "db/response"
 
 
-SPEAK_SUCCESS_PAYLOAD = "success"
+SPEAK_SUCCESS_PAYLOAD = "ok"
 STT_FAIL_PAYLOAD = 'failed'
 MIC_START_PAYLOAD = "start"
 
-FORMS_CONTEXT = """
-Your task is to process a user answer and extract the core data for a response
-to be stored in a database, this answer comes from a speach-to-text service, so
-it can have some unaccurate data, try to fix it if has some mistake. Example:
-Input = Question: Do you have any known allergies? If so, please list them.
-Answer: Yes I have to allergies, I am allergic to milk and I don't fell well taking dipyrone.
-Output = milk, dipyrone.
-Question: How old are you? 
-Answer: I am an industrial engineering student.
-"""
+FIRST_QUESTION = "What brings you here today?"
+LLM_ENOUGH = "I got enough info"
+FW_FAIL_PAYLOAD = "failed"
+LLM_FAIL_PAYLOAD = "failed"
 
-main_state = 0
-forms_state = 0
-forms_flow_state = 0
-measures_state = 0
-
-jsonPost = {}
 class Forms(Enum):
     AGE = (0, "How old are you?")
     SEX = (1, "What is your biological sex?")
@@ -63,6 +51,12 @@ class Forms(Enum):
     @property
     def question(self):
         return self.value[1]
+    
+    @classmethod
+    def get_by_index(cls, index):
+        for member in cls:
+            if member.index == index:
+                return member
 
 class Measures(Enum):
     TEMPERATURE = 0
@@ -73,6 +67,15 @@ class State(Enum):
     FORMS = 0
     MEASURES = 1
     INTERVIEW = 2
+    IDLE = 3
+
+main_state = State.FORMS
+forms_state = 0
+forms_flow_state = 0
+measures_state = 0
+jsonPost = {}
+interview = []
+dinamic_context = interview_context
 
 async def main():
     try:
@@ -84,8 +87,7 @@ async def main():
             await client.subscribe(LLM_RESPONSE)
             await client.subscribe(TOPIC_DB_RESPONSE)
             log.info(f"Connected to Broker {MQTT_BROKER}.")
-            run_forms_flow(client)
-            question = Forms(forms_state).question
+            question = Forms.get_by_index(forms_state).question
             await client.publish(TOPIC_SPEAK, question)
             async for message in client.messages:
                 try:
@@ -102,6 +104,10 @@ async def main():
                     
                 elif main_state == State.MEASURES:
                     await run_measures_flow(client, message, payload)
+                    if main_state == State.INTERVIEW:
+                        interview.append(FIRST_QUESTION)
+                        dinamic_context += "\n[You]: " + FIRST_QUESTION
+                        await client.publish(TOPIC_SPEAK, FIRST_QUESTION)
 
                 elif main_state == State.INTERVIEW:
                     await run_interview_flow(client, message, payload)
@@ -113,6 +119,45 @@ async def main():
 
 async def run_forms_flow(client, message, payload):
     if message.topic.matches(SPEAK_RESPONSE):
+        print('caiu')
+        if payload != SPEAK_SUCCESS_PAYLOAD:
+            log.warning(f"Audio_player_service falhou: '{payload}'")
+            return False #???
+        await client.publish(MIC_START, MIC_START_PAYLOAD)
+        return True #???
+            
+    elif message.topic.matches(TOPIC_TRANSCRIPTION):
+        if payload == STT_FAIL_PAYLOAD:
+            log.warning(f"Mic_stt_service failed: '{payload}'")
+            return False #???
+        content = build_llm_prompt(payload, State(main_state))
+        await client.publish(TOPIC_PROMPT, content)
+        return True #???
+
+    elif message.topic.matches(LLM_RESPONSE):
+        if payload != LLM_FAIL_PAYLOAD:
+            log.warning(f"Gemini_service failed: '{payload}'")
+            return False #???
+        jsonPost[Forms.get_by_index(forms_state)] = message
+        forms_state += 1
+        if forms_state > 5: #DISEASES
+            main_state = State.MEASURES
+        else:
+            question = Forms.get_by_index(forms_state).question
+            await client.publish(TOPIC_SPEAK, question)
+        return True #???
+
+async def run_measures_flow(client, message, payload):
+    if message.topic.matches(FW_OUTPUT):
+        if payload == FW_FAIL_PAYLOAD:
+            log.warning(f"Firmware_service failed: '{payload}'")
+            return False #???
+        
+        #processes_fw_output(payload)
+        #main_state = State.INTERVIEWS
+
+async def run_interview_flow(client, message, payload):
+    if message.topic.matches(SPEAK_RESPONSE):
         if payload != SPEAK_SUCCESS_PAYLOAD:
             log.warning(f"Audio_player_service falhou: '{payload}'")
             return False #???
@@ -123,37 +168,31 @@ async def run_forms_flow(client, message, payload):
         if payload != STT_FAIL_PAYLOAD:
             log.warning(f"Mic_stt_service failed: '{payload}'")
             return False #???
-        content = build_llm_prompt(payload, State.FORMS)
-        await client.publish(TOPIC_PROMPT, content)
+        interview.append(payload)
+        if len(interview)/2 >= 10:
+            a=1 #STOP
+        prompt = build_llm_prompt(payload, State(main_state))
+        await client.publish(TOPIC_PROMPT, prompt)
         return True #???
 
     elif message.topic.matches(LLM_RESPONSE):
-        if payload != LLM_FAIL_PAYLOAD:
+        if payload == LLM_FAIL_PAYLOAD:
             log.warning(f"Gemini_service failed: '{payload}'")
             return False #???
-        jsonPost[Forms(forms_state)] = message
-        forms_state += 1
-        if forms_state > 5: #DISEASES
-            main_state += 1
-        else:
-            question = Forms(forms_state).question
-            await client.publish(TOPIC_SPEAK, question)
-        return True #???
-
-def run_measures_flow(client, message, payload):
-    if message.topic.matches(FW_OUTPUT):
-        if payload == FW_FAIL_PAYLOAD:
-            log.warning(f"Firmware_service failed: '{payload}'")
-            return False #???
-        #processes_fw_output(payload)
-
-#def run_interview_flow(client, message, payload):
-
+        elif payload == LLM_ENOUGH:
+            log.info("Got enough info")
+            main_state = State.IDLE
+        interview.append(payload)
+        await client.publish(TOPIC_SPEAK, payload)
+        
 def build_llm_prompt(message, status):
     if status == State.FORMS:
-        question = Forms(forms_state).question
+        question = Forms.get_by_index(forms_state).question
         prompt = (process_answer_context + question + '\nAnswer:\n' + message + '\nOutput:')
         return prompt
+    if status == State.INTERVIEW:
+        dinamic_context += "\n[Patient]: " + message
+        return dinamic_context
 
 #def insert_db(client, information, payload):
 
