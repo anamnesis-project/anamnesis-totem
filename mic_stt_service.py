@@ -3,8 +3,13 @@ import websockets
 import aiomqtt as mqtt
 import pyaudio
 import logging
+import os
+from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.INFO)
+load_dotenv()
+server_ip = os.environ.get('SERVER_PATH')
+
 
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
@@ -12,7 +17,7 @@ MIC_START = "voice/mic_stt/start"
 MIC_STOP = "voice/mic_stt/stop"
 TOPIC_TRANSCRIPTION = "voice/mic_stt/transcription" # Para onde vai o texto final
 
-WEBSOCKET_URI = "ws://192.168.18.47:8000/ws/stt"
+WEBSOCKET_URI = "ws://"+ server_ip +"/ws/stt"
 
 SAMPLE_RATE = 48000 #16000
 CHUNK_SIZE = 4096
