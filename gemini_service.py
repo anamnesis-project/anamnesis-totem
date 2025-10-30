@@ -36,15 +36,14 @@ async def main():
             await client.subscribe(TOPIC_PROMPT)
 
             logging.info("Waiting for prompt...")
-            async with client.messages() as messages:
-                async for message in messages:
-                    if message.topic.matches(TOPIC_PROMPT):
-                        prompt = message.payload.decode('utf-8')
-                        logging.info(f"Received prompt: {prompt}")
-                        response = await async_generate_content(prompt)
-                        logging.info(f"Sending Gemini response ({LLM_RESPONSE}): {response}")
-                        await client.publish(LLM_RESPONSE, response)
-                        
+            async for message in client.messages:
+                if message.topic.matches(TOPIC_PROMPT):
+                    prompt = message.payload.decode('utf-8')
+                    logging.info(f"Received prompt: {prompt}")
+                    response = await async_generate_content(prompt)
+                    logging.info(f"Sending Gemini response ({LLM_RESPONSE}): {response}")
+                    await client.publish(LLM_RESPONSE, response)
+                    
     except mqtt.exceptions.MqttError as e:
         logging.critical(f"ERROR: Could not connecto to MQTT at {MQTT_BROKER}:{MQTT_PORT}.")
         logging.critical(f"Detail: {e}")
@@ -117,10 +116,11 @@ Input:
 interview_context = """
     **Context**: You are a medical triage assistant.
     Your task is to analyze the patients story,
-    retreive the most important topics and generate the next question to ask them in order to further obtain important information.
-    Keep a empathetic and professional tone throughout the conversation.
+    retreive the most important topics and generate the next most relevant question to ask them in order to further obtain important information.
+    Don't repeat questions and don't go too deep on topic that has already been covered.
+    Keep a professional tone throughout the conversation.
     If the conversation history is empty, generate the first question.
-    Keep questions short and objective.
+    Keep questions short and objective. Don't say "Thank you" or similar phrases. 
     Do not include markdown syntax in the answer. Respond with plain text only.
     If you feel you have retreived enough information, or there is no relevant question to be made, answer with
     "I got enough info"

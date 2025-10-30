@@ -34,8 +34,8 @@ async def fw_communication(command: str) -> str:
         return json.loads(response)
 
     except Exception as e:
-        logging.error(f"Error calling Gemini API: {e}")
-        return "Error calling Gemini API"
+        logging.error(f"Error communication with FW: {e}")
+        return "Error communication with FW"
 
 async def main():
     try:
@@ -44,13 +44,12 @@ async def main():
             await client.subscribe(FW_INPUT)
 
             logging.info("Waiting for command...")
-            async with client.messages() as messages:
-                async for message in messages:
-                    if message.topic.matches(FW_INPUT):
-                        command = message.payload.decode('utf-8')
-                        logging.info(f"Received command: {command}")
-                        response = await fw_communication(command)
-                        await client.publish(FW_OUTPUT, response)
+            async for message in client.messages:
+                if message.topic.matches(FW_INPUT):
+                    command = message.payload.decode('utf-8')
+                    logging.info(f"Received command: {command}")
+                    response = 'FAILED'#await fw_communication(command)
+                    await client.publish(FW_OUTPUT, response)
                         
     except mqtt.exceptions.MqttError as e:
         logging.critical(f"ERROR: Could not connecto to MQTT at {MQTT_BROKER}:{MQTT_PORT}.")

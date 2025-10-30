@@ -78,6 +78,7 @@ interview = []
 dinamic_context = interview_context
 
 async def main():
+    global main_state, dinamic_context
     try:
         async with mqtt.Client(MQTT_BROKER, port=MQTT_PORT) as client:
             
@@ -103,7 +104,9 @@ async def main():
                         await client.publish(FW_INPUT, str(measures_state))
                     
                 elif main_state == State.MEASURES:
-                    await run_measures_flow(client, message, payload)
+                    print('caiuMeasure')
+                    main_state = State.INTERVIEW
+                    #await run_measures_flow(client, message, payload)
                     if main_state == State.INTERVIEW:
                         interview.append(FIRST_QUESTION)
                         dinamic_context += "\n[You]: " + FIRST_QUESTION
@@ -118,6 +121,7 @@ async def main():
         log.info("Orquestrador encerrado pelo usuário.")
 
 async def run_forms_flow(client, message, payload):
+    global main_state, forms_state
     if message.topic.matches(SPEAK_RESPONSE):
         print('caiu')
         if payload != SPEAK_SUCCESS_PAYLOAD:
@@ -135,13 +139,15 @@ async def run_forms_flow(client, message, payload):
         return True #???
 
     elif message.topic.matches(LLM_RESPONSE):
-        if payload != LLM_FAIL_PAYLOAD:
+        if payload == LLM_FAIL_PAYLOAD:
             log.warning(f"Gemini_service failed: '{payload}'")
             return False #???
         jsonPost[Forms.get_by_index(forms_state)] = message
         forms_state += 1
-        if forms_state > 5: #DISEASES
+        print('form state:', forms_state)
+        if forms_state >= 5: #DISEASES
             main_state = State.MEASURES
+            print('Changing to MEASURES')
         else:
             question = Forms.get_by_index(forms_state).question
             await client.publish(TOPIC_SPEAK, question)
@@ -157,6 +163,7 @@ async def run_measures_flow(client, message, payload):
         #main_state = State.INTERVIEWS
 
 async def run_interview_flow(client, message, payload):
+    global main_state, dinamic_context
     if message.topic.matches(SPEAK_RESPONSE):
         if payload != SPEAK_SUCCESS_PAYLOAD:
             log.warning(f"Audio_player_service falhou: '{payload}'")
@@ -165,7 +172,7 @@ async def run_interview_flow(client, message, payload):
         return True #???
             
     elif message.topic.matches(TOPIC_TRANSCRIPTION):
-        if payload != STT_FAIL_PAYLOAD:
+        if payload == STT_FAIL_PAYLOAD:
             log.warning(f"Mic_stt_service failed: '{payload}'")
             return False #???
         interview.append(payload)
@@ -183,9 +190,11 @@ async def run_interview_flow(client, message, payload):
             log.info("Got enough info")
             main_state = State.IDLE
         interview.append(payload)
+        dinamic_context += "\n[You]: " + payload
         await client.publish(TOPIC_SPEAK, payload)
         
 def build_llm_prompt(message, status):
+    global dinamic_context, forms_state
     if status == State.FORMS:
         question = Forms.get_by_index(forms_state).question
         prompt = (process_answer_context + question + '\nAnswer:\n' + message + '\nOutput:')
