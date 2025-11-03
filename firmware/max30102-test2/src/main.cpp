@@ -2,6 +2,10 @@
 
 // --- Classe Falsa (Dummy Class) para resolver erros de linkagem ---
 // Isso satisfaz as chamadas para o SSD1306 que ainda existem na biblioteca Pulse.h
+
+#include <Adafruit_MLX90614.h>
+Adafruit_MLX90614 mlx = Adafruit_MLX90614();
+
 class SSD1306 {
 public:
     SSD1306() {}
@@ -75,6 +79,11 @@ void setup(void) {
   sensor.setup(); 
 
   Serial.println("Setup concluído. Por favor, posicione o dedo no sensor.");
+  mlx = Adafruit_MLX90614();
+  if (!mlx.begin()) {
+        Serial.println("Error connecting to MLX sensor. Check wiring.");
+        while (1);
+    };
 }
 
 long lastBeat = 0;
@@ -162,6 +171,15 @@ void loop() {
       }
     }
   } else {
+    Serial.print("Ambient temperature = "); 
+    Serial.print(mlx.readAmbientTempC());
+    Serial.print("°C");      
+    Serial.print("   ");
+    Serial.print("Object temperature = "); 
+    Serial.print(mlx.readObjectTempC()); 
+    Serial.println("°C");
+
+    Serial.println("-----------------------------------------------------------------");
     // Quando não há dedo, apenas aguarda. A lógica de sleep foi removida.
     delay(100);
   }

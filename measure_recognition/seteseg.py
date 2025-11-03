@@ -86,15 +86,15 @@ for label, coords in digitos_coord.items():
     numero = ""
     for (x, y, w, h) in coords:
         dig_img = img[y:y+h, x:x+w]
-        numero += ler_digito(dig_img, img_color, x, y)
-        cv2.rectangle(img_color, (x, y), (x+w, y+h), (255, 255, 0), 1)  # amarelo = caixa do dígito
+        numero += ler_digito(dig_img, img, x, y)
+        cv2.rectangle(img, (x, y), (x+w, y+h), (255, 255, 0), 1)  # amarelo = caixa do dígito
     valores[label] = numero
 
 print("\nLeitura automática:")
 for k, v in valores.items():
     print(f"{k.capitalize()}: {v}")
 
-cv2.imwrite("debug_segmentos.png", img_color)
+cv2.imwrite("debug_segmentos.png", img)
 print("\nImagem de depuração salva: 'debug_segmentos.png'")
 
 
