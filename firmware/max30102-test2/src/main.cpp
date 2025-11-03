@@ -1,10 +1,30 @@
-#include <Arduino.h> // Adicionado para definir __FlashStringHelper
-
-// --- Classe Falsa (Dummy Class) para resolver erros de linkagem ---
-// Isso satisfaz as chamadas para o SSD1306 que ainda existem na biblioteca Pulse.h
-
+#include <Arduino.h>
+#include <ESP32Servo.h>
 #include <Adafruit_MLX90614.h>
+#include <vector>
+#include <algorithm>
+
+// Definição dos pinos
+#define SERVO1_PIN 13
+#define SERVO2_PIN 12
+#define RELE_PIN 14
+
+// Definição dos estados
+enum State {
+    IDLE,
+    MEASURE_TEMP,
+    MEASURE_OXI,
+    SERVO1_FORWARD,
+    SERVO1_BACKWARD,
+    SERVO2_FORWARD,
+    SERVO2_BACKWARD,
+    RELE_CONTROL
+};
+
+// Objetos globais
 Adafruit_MLX90614 mlx = Adafruit_MLX90614();
+Servo servo1;
+Servo servo2;
 
 class SSD1306 {
 public:
@@ -60,42 +80,202 @@ long lastRedAC = 0;
 long lastIrAC = 0;
 
 
+// Variáveis globais de controle
+State currentState = IDLE;
+std::vector<float> tempSamples;
+std::vector<int> oxiSamples;
+unsigned long lastSampleTime = 0;
+unsigned long releStartTime = 0;
+unsigned long lastBeat = 0;
+unsigned long lastPrintTime = 0;
+int sampleCount = 0;
+
 void setup(void) {
-  Serial.begin(115200);
-  Serial.println("\nOxímetro de Pulso - Inicializando...");
+    Serial.begin(115200);
+    
+    // Inicializa I2C com os pinos customizados para o ESP32
+    Wire.begin(I2C_SDA, I2C_SCL);
 
-  // Inicializa I2C com os pinos customizados para o ESP32
-  Wire.begin(I2C_SDA, I2C_SCL);
-
-  Serial.println("Inicializando o sensor MAX30102...");
-  if (!sensor.begin()) {
-    Serial.println("ERRO: Sensor MAX30102 não encontrado!");
-    while (1); // Trava a execução se o sensor falhar
-  }
-  
-  // Ajusta o sensor para uma melhor leitura. Se sua função 'setup' for diferente,
-  // você pode precisar adaptar esta linha. Por exemplo, ajustando a corrente do LED
-  // para obter um sinal mais forte e estável, o que pode melhorar a detecção.
-  sensor.setup(); 
-
-  Serial.println("Setup concluído. Por favor, posicione o dedo no sensor.");
-  mlx = Adafruit_MLX90614();
-  if (!mlx.begin()) {
-        Serial.println("Error connecting to MLX sensor. Check wiring.");
+    // Inicializa sensor MAX30102
+    if (!sensor.begin()) {
+        Serial.println("ERRO: Sensor MAX30102 não encontrado!");
         while (1);
-    };
+    }
+    sensor.setup();
+
+    // Inicializa MLX90614
+    if (!mlx.begin()) {
+        Serial.println("Erro: MLX90614 não encontrado!");
+        while (1);
+    }
+
+    // Inicializa Servos
+    ESP32PWM::allocateTimer(0);
+    ESP32PWM::allocateTimer(1);
+    servo1.setPeriodHertz(50);
+    servo2.setPeriodHertz(50);
+    servo1.attach(SERVO1_PIN);
+    servo2.attach(SERVO2_PIN);
+    servo1.write(0);
+    servo2.write(0);
+
+    // Inicializa Relé
+    pinMode(RELE_PIN, OUTPUT);
+    digitalWrite(RELE_PIN, LOW);
 }
 
-long lastBeat = 0;
-long lastPrintTime = 0; // Para controlar a frequência de impressão no terminal
+float getMedian(std::vector<float>& samples) {
+    if (samples.empty()) return 0;
+    std::sort(samples.begin(), samples.end());
+    return samples[samples.size() / 2];
+}
+
+int getMedianInt(std::vector<int>& samples) {
+    if (samples.empty()) return 0;
+    std::sort(samples.begin(), samples.end());
+    return samples[samples.size() / 2];
+}
+
+void processSerialCommands() {
+    if (Serial.available()) {
+        String command = Serial.readStringUntil('\n');
+        
+        if (command == "T") {
+            currentState = MEASURE_TEMP;
+            tempSamples.clear();
+            sampleCount = 0;
+            lastSampleTime = millis();
+        }
+        else if (command == "O") {
+            currentState = SERVO1_FORWARD;
+        }
+        else if (command == "P1") {
+            currentState = SERVO2_FORWARD;
+        }
+        else if (command == "P2") {
+            currentState = SERVO2_BACKWARD;
+        }
+        else if (command == "P") {
+            currentState = RELE_CONTROL;
+            releStartTime = millis();
+            digitalWrite(RELE_PIN, HIGH);
+        }
+    }
+}
 
 void loop() {
-  sensor.check();
-  long now = millis();
+    processSerialCommands();
+    unsigned long currentTime = millis();
 
-  if (!sensor.available()) {
-    return;
-  }
+    switch (currentState) {
+        case IDLE:
+            // Nada a fazer, aguardando comandos
+            if (currentTime - lastPrintTime > 1000) {
+                lastPrintTime = currentTime;
+                Serial.println("Waiting for commands...");
+            }
+            break;
+
+        case MEASURE_TEMP:
+            if (currentTime - lastSampleTime >= 100) {
+                float temp = mlx.readObjectTempC();
+                tempSamples.push_back(temp);
+                sampleCount++;
+                lastSampleTime = currentTime;
+
+                if (sampleCount >= 5) {
+                    float medianTemp = getMedian(tempSamples);
+                    Serial.printf("T:OK:%.2f\n", medianTemp);
+                    currentState = IDLE;
+                }
+            }
+            break;
+
+        case SERVO1_FORWARD:
+            servo1.write(90);
+            delay(500); // Aguarda o servo se posicionar
+            currentState = MEASURE_OXI;
+            oxiSamples.clear();
+            sampleCount = 0;
+            lastSampleTime = currentTime;
+            break;
+
+        case MEASURE_OXI:
+            if (currentTime - lastSampleTime >= 100) {
+                sensor.check();
+                
+                if (sensor.available()) {
+                    uint32_t irValue = sensor.getIR();
+                    uint32_t redValue = sensor.getRed();
+                    sensor.nextSample();
+
+                    // Processamento do SpO2
+                    int16_t IR_signal = pulseIR.ma_filter(pulseIR.dc_filter(irValue));
+                    int16_t Red_signal = pulseRed.ma_filter(pulseRed.dc_filter(redValue));
+                    
+                    if (pulseIR.isBeat(IR_signal)) {
+                        pulseRed.isBeat(Red_signal);
+                        
+                        long beatInterval = currentTime - lastBeat;
+                        if (beatInterval > 600) {
+                            lastBeat = currentTime;
+                            
+                            long numerator = (pulseRed.avgAC() * pulseIR.avgDC()) / 256;
+                            long denominator = (pulseRed.avgDC() * pulseIR.avgAC()) / 256;
+                            int RX100 = (denominator > 0) ? (numerator * 100) / denominator : 999;
+
+                            if (RX100 >= 0 && RX100 < 184) {
+                                oxiSamples.push_back(spo2_table[RX100]);
+                                sampleCount++;
+                            }
+                        }
+                    }
+                }
+
+                if (sampleCount >= 5) {
+                    int medianSPO2 = getMedianInt(oxiSamples);
+                    Serial.printf("O:OK:%d\n", medianSPO2);
+                    currentState = SERVO1_BACKWARD;
+                }
+
+                if (currentTime - lastPrintTime > 1000) {
+                    lastPrintTime = currentTime;
+                    Serial.print("Measuring SpO2... Samples: ");
+                    Serial.println(sampleCount);
+                }
+
+                lastSampleTime = currentTime;
+            }
+            break;
+
+        case SERVO1_BACKWARD:
+            servo1.write(0);
+            delay(500);
+            currentState = IDLE;
+            break;
+
+        case SERVO2_FORWARD:
+            servo2.write(90);
+            delay(500);
+            Serial.println("P1:OK");
+            currentState = IDLE;
+            break;
+
+        case SERVO2_BACKWARD:
+            servo2.write(0);
+            delay(500);
+            Serial.println("P2:OK");
+            currentState = IDLE;
+            break;
+
+        case RELE_CONTROL:
+            if (currentTime - releStartTime >= 100) {
+                digitalWrite(RELE_PIN, LOW);
+                Serial.println("P:OK");
+                currentState = IDLE;
+            }
+            break;
+    }
 
   uint32_t irValue = sensor.getIR();
   uint32_t redValue = sensor.getRed(); // Ler ambos os valores para os filtros
@@ -112,7 +292,7 @@ void loop() {
     lastBeat = millis(); // Reseta o timer da batida quando o dedo é detectado
     Serial.println("Dedo detectado. Realizando medição...");
   }
-
+  /*
   // Se o dedo estiver no sensor, processa os dados
   if (fingerOnSensor) {
     // Processamento do sinal para encontrar o batimento
@@ -126,10 +306,10 @@ void loop() {
     pulseRed.isBeat(Red_signal); // A chamada é necessária, mesmo sem usar o resultado.
 
     if (beatIR) {
-      long beatInterval = now - lastBeat;
+      long beatInterval = currentTime - lastBeat;
       
       if (beatInterval > 600) { 
-          lastBeat = now;
+          lastBeat = currentTime;
           
           long btpm = 60000 / beatInterval;
           if (btpm > 40 && btpm < 200) {
@@ -148,8 +328,8 @@ void loop() {
     }
 
     // Imprime os valores no Monitor Serial a cada 1 segundo para não poluir o terminal
-    if (now - lastPrintTime > 1000) {
-      lastPrintTime = now;
+    if (currentTime - lastPrintTime > 1000) {
+      lastPrintTime = currentTime;
       if (beatAvg > 0 && SPO2 > 0) {
         Serial.print("BPM: ");
         Serial.print(beatAvg);
@@ -157,14 +337,14 @@ void loop() {
         Serial.print(SPO2);
         Serial.println("%");
         
-        /* --- Linhas de Debug (Comentadas) ---
-        Serial.print(" | Ratio: ");
-        Serial.print(lastRatio);
-        Serial.print(" | Red_AC: ");
-        Serial.print(lastRedAC);
-        Serial.print(" | IR_AC: ");
-        Serial.println(lastIrAC);
-        */
+        //--- Linhas de Debug (Comentadas) ---
+        //Serial.print(" | Ratio: ");
+        //Serial.print(lastRatio);
+        //Serial.print(" | Red_AC: ");
+        //Serial.print(lastRedAC);
+        //Serial.print(" | IR_AC: ");
+        //Serial.println(lastIrAC);
+        
 
       } else {
         Serial.println("Calculando..."); // Feedback para o usuário
@@ -182,6 +362,6 @@ void loop() {
     Serial.println("-----------------------------------------------------------------");
     // Quando não há dedo, apenas aguarda. A lógica de sleep foi removida.
     delay(100);
-  }
+  }*/
 }
 
