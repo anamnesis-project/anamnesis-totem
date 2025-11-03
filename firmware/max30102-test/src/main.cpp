@@ -30,7 +30,7 @@ but it will also run at 3.3V.
 //
 // MAX30105 particleSensor;
 //
-// const byte RATE_SIZE = 4; //Increase this for more averaging. 4 is good.
+// const byte RATE_SIZE = 4; //Increase this for more a3veraging. 4 is good.
 // byte rates[RATE_SIZE]; //Array of heart rates
 // byte rateSpot = 0;
 // long lastBeat = 0; //Time at which the last beat occurred
@@ -125,7 +125,12 @@ but it will also run at 3.3V.
 #include <Wire.h>
 #include "MAX30105.h"
 #include "spo2_algorithm.h"
+#include <Adafruit_MLX90614.h>
 
+TwoWire I2CMLX = TwoWire(0);
+TwoWire I2CMAX = TwoWire(1);
+
+Adafruit_MLX90614 mlx = Adafruit_MLX90614();
 MAX30105 particleSensor;
 
 #define MAX_BRIGHTNESS 255
@@ -152,11 +157,18 @@ byte readLED = 13; //Blinks with each data read
 void setup()
 {
     Serial.begin(115200); // initialize serial communication at 115200 bits per second:
-    Wire.begin(21, 22);
-    //pinMode(pulseLED, OUTPUT);
-    //pinMode(readLED, OUTPUT);
-    // Initialize sensor
-    if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) //Use default I2C port, 400kHz speed
+    
+    // Configure I2C for MLX90614
+    I2CMLX.begin(21, 22); // SDA, SCL for I2C0
+    mlx = Adafruit_MLX90614();
+    if (!mlx.begin()) {
+        Serial.println("Error connecting to MLX sensor. Check wiring.");
+        while (1);
+    }
+    
+    // Configure I2C for MAX30105
+    I2CMAX.begin(26, 27); // SDA, SCL for I2C1
+    if (!particleSensor.begin(I2CMAX, I2C_SPEED_FAST)) //Use custom I2C port, 400kHz speed
     {
         Serial.println("###################");
         Serial.println(F("MAX30102 was not found. Please check wiring/power."));
@@ -172,6 +184,13 @@ void setup()
     int adcRange = 4096; //Options: 2048, 4096, 8192, 16384
 
     particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange); //Configure sensor with these settings
+
+    while (!Serial);
+
+    if (!mlx.begin()) {
+        Serial.println("Error connecting to MLX sensor. Check wiring.");
+        while (1);
+    };
 }
 
 void loop()
@@ -241,5 +260,16 @@ void loop()
 
         //After gathering 25 new samples recalculate HR and SP02
         maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
+
+        Serial.print("Ambient temperature = "); 
+        Serial.print(mlx.readAmbientTempC());
+        Serial.print("°C");      
+        Serial.print("   ");
+        Serial.print("Object temperature = "); 
+        Serial.print(mlx.readObjectTempC()); 
+        Serial.println("°C");
+
+        Serial.println("-----------------------------------------------------------------");
+        delay(1000);
     }
 }

@@ -8,11 +8,10 @@
         {
             "name": "PlatformIO",
             "includePath": [
-                "/home/rj/Documents/anamnesis-totem/firmware/max30102-test2/include",
-                "/home/rj/Documents/anamnesis-totem/firmware/max30102-test2/src",
-                "/home/rj/Documents/anamnesis-totem/firmware/max30102-test2/lib/MAX30102",
-                "/home/rj/Documents/anamnesis-totem/firmware/max30102-test2/.pio/libdeps/esp32dev/Adafruit MLX90614 Library",
-                "/home/rj/Documents/anamnesis-totem/firmware/max30102-test2/.pio/libdeps/esp32dev/Adafruit BusIO",
+                "/home/rj/Documents/anamnesis-totem/firmware/gy906-test/include",
+                "/home/rj/Documents/anamnesis-totem/firmware/gy906-test/src",
+                "/home/rj/Documents/anamnesis-totem/firmware/gy906-test/.pio/libdeps/esp32dev/Adafruit MLX90614 Library",
+                "/home/rj/Documents/anamnesis-totem/firmware/gy906-test/.pio/libdeps/esp32dev/Adafruit BusIO",
                 "/home/rj/.platformio/packages/framework-arduinoespressif32/libraries/SPI/src",
                 "/home/rj/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
                 "/home/rj/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/newlib/platform_include",
@@ -242,11 +241,10 @@
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
-                    "/home/rj/Documents/anamnesis-totem/firmware/max30102-test2/include",
-                    "/home/rj/Documents/anamnesis-totem/firmware/max30102-test2/src",
-                    "/home/rj/Documents/anamnesis-totem/firmware/max30102-test2/lib/MAX30102",
-                    "/home/rj/Documents/anamnesis-totem/firmware/max30102-test2/.pio/libdeps/esp32dev/Adafruit MLX90614 Library",
-                    "/home/rj/Documents/anamnesis-totem/firmware/max30102-test2/.pio/libdeps/esp32dev/Adafruit BusIO",
+                    "/home/rj/Documents/anamnesis-totem/firmware/gy906-test/include",
+                    "/home/rj/Documents/anamnesis-totem/firmware/gy906-test/src",
+                    "/home/rj/Documents/anamnesis-totem/firmware/gy906-test/.pio/libdeps/esp32dev/Adafruit MLX90614 Library",
+                    "/home/rj/Documents/anamnesis-totem/firmware/gy906-test/.pio/libdeps/esp32dev/Adafruit BusIO",
                     "/home/rj/.platformio/packages/framework-arduinoespressif32/libraries/SPI/src",
                     "/home/rj/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
                     "/home/rj/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/newlib/platform_include",
