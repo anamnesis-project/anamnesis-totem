@@ -59,9 +59,25 @@ class Forms(Enum):
                 return member
 
 class Measures(Enum):
-    TEMPERATURE = 0
-    OXYMETER = 1
-    PRESSURE = 2
+    TEMPERATURE = (0, "Please place your forehead in front of the sensor for temperature?")
+    OXYMETER = (1, "Please place the oximeter on your finger?")
+    PRESSURE_OPEN_DOOR = (2, "Please grab and say Im ready when ready")
+    PRESSURE_START_MONITOR = (3, "Please place the monitor back and say done when it is done")
+    PRESSURE_CLOSE_DOOR = (4, "")
+
+    @property
+    def index(self):
+        return self.value[0]
+
+    @property
+    def speach(self):
+        return self.value[1]
+    
+    @classmethod
+    def get_by_index(cls, index):
+        for member in cls:
+            if member.index == index:
+                return member
 
 class State(Enum):
     FORMS = 0
@@ -71,7 +87,6 @@ class State(Enum):
 
 main_state = State.FORMS
 forms_state = 0
-forms_flow_state = 0
 measures_state = 0
 jsonPost = {}
 interview = []
@@ -93,20 +108,20 @@ async def main():
             async for message in client.messages:
                 try:
                     payload = message.payload.decode('utf-8')
-                    log.info(f"<== MENSAGEM: Tópico '{message.topic}': '{payload}'")
+                    log.info(f"<== Message: Topic '{message.topic}': '{payload}'")
                 except UnicodeDecodeError:
-                    log.warning(f"Mensagem não-UTF8 recebida em {message.topic}. Ignorando.")
+                    log.warning(f"Non UTF8 message got from {message.topic}")
                     continue
 
                 if main_state == State.FORMS:
                     await run_forms_flow(client, message, payload)
                     if main_state == State.MEASURES:
-                        await client.publish(FW_INPUT, str(measures_state))
+                        await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
+                        #await client.publish(TOTEM SCREEN)
+                        await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
                     
                 elif main_state == State.MEASURES:
-                    print('caiuMeasure')
-                    main_state = State.INTERVIEW
-                    #await run_measures_flow(client, message, payload)
+                    await run_measures_flow(client, message, payload)
                     if main_state == State.INTERVIEW:
                         interview.append(FIRST_QUESTION)
                         dinamic_context += "\n[You]: " + FIRST_QUESTION
@@ -154,10 +169,79 @@ async def run_forms_flow(client, message, payload):
         return True #???
 
 async def run_measures_flow(client, message, payload):
+    global main_state, measures_state
     if message.topic.matches(FW_OUTPUT):
         if payload == FW_FAIL_PAYLOAD:
             log.warning(f"Firmware_service failed: '{payload}'")
             return False #???
+        if measures_state == Measures.TEMPERATURE.index:
+            if payload.startswith("T:OK"):
+                try:
+                    parts = payload.split(':')
+                    value = float(parts[2])
+                    jsonPost["temperature"] = value
+                    log.info(f"Temperature recorded: {value}°C")
+                    measures_state += 1
+                    #await client.publish(SCREEN SHOW RESULT)
+                    await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
+                    await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
+
+                except (IndexError, ValueError):
+                    log.warning(f"Invalid temperature '{payload}'")
+            elif payload.startswith("T:ERR"):
+                log.warning("Temperature measurement error.")
+            else:
+                log.warning(f"Unexpected temperature payload: '{payload}'")
+        
+        elif measures_state == Measures.OXYMETER.index:
+            if payload.startswith("O:OK"):
+                try:
+                    parts = payload.split(':')
+                    value = int(parts[2])
+                    jsonPost["oxygen_saturation"] = value
+                    log.info(f"Oxymeter recorded: {value}%")
+                    measures_state += 1
+                    #await client.publish(SCREEN SHOW RESULT)
+                    await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
+                    await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
+                except (IndexError, ValueError):
+                    log.warning(f"Invalid oxymeter '{payload}'")
+            elif payload.startswith("O:ERR"):
+                log.warning("Oxymeter measurement error.")
+            else:
+                log.warning(f"Unexpected oxymeter payload: '{payload}'")
+
+        elif measures_state == Measures.PRESSURE_OPEN_DOOR.index:
+            if payload.startswith("P0:OK"):
+                measures_state += 1
+                #VOICE COMMAND TO START MONITORING
+                await client.publish(TOPIC_SPEAK, 'TELL ME WHEN READY')
+            elif payload.startswith("P0:ERR"):
+                log.warning("Open pressure monitor door error.")
+            else:
+                log.warning(f"Unexpected open pressure monitor door payload: '{payload}'")
+
+        elif measures_state == Measures.PRESSURE_START_MONITOR.index:
+            if payload.startswith("P1:OK"):
+                measures_state += 1
+                #await client.publish(TOPIC_CAM, 'START READING')
+            elif payload.startswith("P1:ERR"):
+                log.warning("Start pressure monitor error.")
+            else:
+                log.warning(f"Unexpected start pressure monitor payload: '{payload}'")
+
+        elif measures_state == Measures.PRESSURE_CLOSE_DOOR.index:
+            if payload.startswith("P2:OK"):
+                measures_state += 1
+            elif payload.startswith("P2:ERR"):
+                log.warning("Close pressure monitor door error.")
+            else:
+                log.warning(f"Unexpected close pressure monitor door payload: '{payload}'")
+
+        return True
+
+
+         
         
         #processes_fw_output(payload)
         #main_state = State.INTERVIEWS

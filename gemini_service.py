@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-api_keu = os.environ.get('GEMINI_API_KEY')
+api_key = os.environ.get('GEMINI_API_KEY')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 MQTT_BROKER = "localhost"
