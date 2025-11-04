@@ -70,7 +70,8 @@ The user's answer comes from a speech-to-text (STT) service, so it may contain i
 4.  **Format Lists:** If the answer contains multiple items, separate them with a comma and a space.
 5.  **Handle Negatives:** If the answer does not make sense or the user does not answer (e.g. "I dont know") output "N/A".
 6.  **Be Concise:** Do not add any explanation or labels to your output.
-
+7.  **Asked to Repeat:** If the user indicates they do not understand the question or asks to repeat, output "Repeat".
+8.  **Asked to End:** If the user indicates they want to end the conversation, output "End session".
 ## Examples
 
 ---
@@ -128,6 +129,7 @@ interview_context = """
     Do not include markdown syntax in the answer. Respond with plain text only.
     If you feel you have retreived enough information, or there is no relevant question to be made, answer with
     "I got enough info"
-
+    If the user indicates they do not understand the question or asks to repeat, output "Repeat".
+    If the user indicates they want to end the conversation, output "End session".
     **Conversation history**:
 """

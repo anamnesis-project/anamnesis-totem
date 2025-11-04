@@ -33,11 +33,13 @@ MIC_START_PAYLOAD = "start"
 
 FIRST_QUESTION = "What brings you here today?"
 LLM_ENOUGH = "I got enough info"
+LLM_REPEAT_PAYLOAD = "Repeat"
+LLM_END_PAYLOAD = "End session"
 FW_FAIL_PAYLOAD = "failed"
 LLM_FAIL_PAYLOAD = "failed"
 
 class Forms(Enum):
-    AGE = (0, "How old are you?")
+    AGE = (0, "Hi, I am Anna, I'm a virtual assistant and I'm here to collect some information to speed up your check-in. Please, answer my questions and follow my instructions. Tell me, how old are you?")
     SEX = (1, "What is your biological sex?")
     OCCUPATION = (2, "What is your occupation?")
     MEDICATIONS = (3, "Are you taking any medications? If so, please list them.")
@@ -59,9 +61,9 @@ class Forms(Enum):
                 return member
 
 class Measures(Enum):
-    TEMPERATURE = (0, "Please place your forehead in front of the sensor for temperature?")
-    OXYMETER = (1, "Please place the oximeter on your finger?")
-    PRESSURE_OPEN_DOOR = (2, "Please grab and say Im ready when ready")
+    TEMPERATURE = (0, "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen.")
+    OXYMETER = (1, "Please, put your finger on the oxymeter as shown on the screen.")
+    PRESSURE_OPEN_DOOR = (2, "Please, grab the cuff inside the totem and place it on your bare arm...")
     PRESSURE_START_MONITOR = (3, "Please place the monitor back and say done when it is done")
     PRESSURE_CLOSE_DOOR = (4, "")
 
@@ -140,7 +142,7 @@ async def run_forms_flow(client, message, payload):
     if message.topic.matches(SPEAK_RESPONSE):
         print('caiu')
         if payload != SPEAK_SUCCESS_PAYLOAD:
-            log.warning(f"Audio_player_service falhou: '{payload}'")
+            log.warning(f"Audio_player_service failed: '{payload}'")
             return False #???
         await client.publish(MIC_START, MIC_START_PAYLOAD)
         return True #???
@@ -157,6 +159,13 @@ async def run_forms_flow(client, message, payload):
         if payload == LLM_FAIL_PAYLOAD:
             log.warning(f"Gemini_service failed: '{payload}'")
             return False #???
+        elif payload == LLM_REPEAT_PAYLOAD:
+            question = Forms.get_by_index(forms_state).question
+            await client.publish(TOPIC_SPEAK, question)
+            return True
+        elif payload == LLM_END_PAYLOAD:
+            #RESET ALL
+            return False
         jsonPost[Forms.get_by_index(forms_state)] = message
         forms_state += 1
         print('form state:', forms_state)
@@ -214,22 +223,28 @@ async def run_measures_flow(client, message, payload):
         elif measures_state == Measures.PRESSURE_OPEN_DOOR.index:
             if payload.startswith("P0:OK"):
                 measures_state += 1
+                #await client.publish(SCREEN SHOW RESULT)
+                await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
                 #VOICE COMMAND TO START MONITORING
                 await client.publish(TOPIC_SPEAK, 'TELL ME WHEN READY')
+                await client.publish(MIC_START, MIC_START_PAYLOAD)
             elif payload.startswith("P0:ERR"):
                 log.warning("Open pressure monitor door error.")
             else:
                 log.warning(f"Unexpected open pressure monitor door payload: '{payload}'")
 
-        elif measures_state == Measures.PRESSURE_START_MONITOR.index:
+    elif message.topic.matches(TOPIC_TRANSCRIPTION):
+        if measures_state == Measures.PRESSURE_START_MONITOR.index:
             if payload.startswith("P1:OK"):
                 measures_state += 1
-                #await client.publish(TOPIC_CAM, 'START READING')
+                await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
+                await client.publish(TOPIC_CAM, 'START READING')
             elif payload.startswith("P1:ERR"):
                 log.warning("Start pressure monitor error.")
             else:
                 log.warning(f"Unexpected start pressure monitor payload: '{payload}'")
 
+    elif message.topic.matches(CAM_OUTPUT):
         elif measures_state == Measures.PRESSURE_CLOSE_DOOR.index:
             if payload.startswith("P2:OK"):
                 measures_state += 1
@@ -270,6 +285,13 @@ async def run_interview_flow(client, message, payload):
         if payload == LLM_FAIL_PAYLOAD:
             log.warning(f"Gemini_service failed: '{payload}'")
             return False #???
+        elif payload == LLM_REPEAT_PAYLOAD:
+            question = Forms.get_by_index(forms_state).question
+            await client.publish(TOPIC_SPEAK, question)
+            return True
+        elif payload == LLM_END_PAYLOAD:
+            #RESET ALL
+            return False
         elif payload == LLM_ENOUGH:
             log.info("Got enough info")
             main_state = State.IDLE
