@@ -1,6 +1,6 @@
 import asyncio
 import aiomqtt as mqtt
-from gemini_service import process_answer_context, interview_context
+from gemini_service import process_answer_context, interview_context, measure_context
 from enum import Enum
 import os
 import logging
@@ -25,11 +25,14 @@ MIC_STOP = "voice/mic_stt/stop"
 TOPIC_TRANSCRIPTION = "voice/mic_stt/transcription" 
 TOPIC_DB_REQUEST = "db/request" 
 TOPIC_DB_RESPONSE = "db/response"
+TOPIC_CAM = "camera/input"
+CAM_OUTPUT = "camera/output"
 
 
 SPEAK_SUCCESS_PAYLOAD = "ok"
 STT_FAIL_PAYLOAD = 'failed'
 MIC_START_PAYLOAD = "start"
+LLM_CONTINUE_PAYLOAD = 'Continue'
 
 FIRST_QUESTION = "What brings you here today?"
 LLM_ENOUGH = "I got enough info"
@@ -41,10 +44,12 @@ LLM_FAIL_PAYLOAD = "failed"
 class Forms(Enum):
     AGE = (0, "Hi, I am Anna, I'm a virtual assistant and I'm here to collect some information to speed up your check-in. Please, answer my questions and follow my instructions. Tell me, how old are you?")
     SEX = (1, "What is your biological sex?")
-    OCCUPATION = (2, "What is your occupation?")
-    MEDICATIONS = (3, "Are you taking any medications? If so, please list them.")
-    ALLERGIES = (4, "Do you have any known allergies? If so, please list them.")
-    DISEASES = (5, "Do you have any chronic illnesess? If so, please list them.")
+    HEIGHT = (2, "What is your height in centimeters?")
+    WEIGHT = (3, "What is your weight in kilograms?")
+    OCCUPATION = (4, "What is your occupation?")
+    MEDICATIONS = (5, "Are you taking any medications? If so, please list them.")
+    ALLERGIES = (6, "Do you have any known allergies? If so, please list them.")
+    DISEASES = (7, "Do you have any chronic illnesess? If so, please list them.")
 
     @property
     def index(self):
@@ -63,8 +68,8 @@ class Forms(Enum):
 class Measures(Enum):
     TEMPERATURE = (0, "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen.")
     OXYMETER = (1, "Please, put your finger on the oxymeter as shown on the screen.")
-    PRESSURE_OPEN_DOOR = (2, "Please, grab the cuff inside the totem and place it on your bare arm...")
-    PRESSURE_START_MONITOR = (3, "Please place the monitor back and say done when it is done")
+    PRESSURE_OPEN_DOOR = (2, "Please, grab the cuff inside the totem and place it on your bare arm, and tell me when you are Im ready...")
+    PRESSURE_START_MONITOR = (3, "Please put the cuff back in the cabinet and tell me when it is done")
     PRESSURE_CLOSE_DOOR = (4, "")
 
     @property
@@ -166,10 +171,10 @@ async def run_forms_flow(client, message, payload):
         elif payload == LLM_END_PAYLOAD:
             #RESET ALL
             return False
-        jsonPost[Forms.get_by_index(forms_state)] = message
+        jsonPost[Forms.get_by_index(forms_state).name] = message
         forms_state += 1
         print('form state:', forms_state)
-        if forms_state >= 5: #DISEASES
+        if forms_state >= 7: #DISEASES
             main_state = State.MEASURES
             print('Changing to MEASURES')
         else:
@@ -191,7 +196,7 @@ async def run_measures_flow(client, message, payload):
                     jsonPost["temperature"] = value
                     log.info(f"Temperature recorded: {value}°C")
                     measures_state += 1
-                    #await client.publish(SCREEN SHOW RESULT)
+                    #await client.publish(TOPIC_SCREEN, NEXT_STEP)
                     await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
                     await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
 
@@ -210,7 +215,7 @@ async def run_measures_flow(client, message, payload):
                     jsonPost["oxygen_saturation"] = value
                     log.info(f"Oxymeter recorded: {value}%")
                     measures_state += 1
-                    #await client.publish(SCREEN SHOW RESULT)
+                    #await client.publish(TOPIC_SCREEN, NEXT_STEP)
                     await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
                     await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
                 except (IndexError, ValueError):
@@ -220,42 +225,67 @@ async def run_measures_flow(client, message, payload):
             else:
                 log.warning(f"Unexpected oxymeter payload: '{payload}'")
 
-        elif measures_state == Measures.PRESSURE_OPEN_DOOR.index:
-            if payload.startswith("P0:OK"):
+        elif measures_state == Measures.PRESSURE_OPEN_DOOR.index: 
+            if payload.startswith("P0:OK"): #SUCCESS OPEN DOOR
                 measures_state += 1
                 #await client.publish(SCREEN SHOW RESULT)
                 await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
                 #VOICE COMMAND TO START MONITORING
-                await client.publish(TOPIC_SPEAK, 'TELL ME WHEN READY')
                 await client.publish(MIC_START, MIC_START_PAYLOAD)
             elif payload.startswith("P0:ERR"):
                 log.warning("Open pressure monitor door error.")
             else:
                 log.warning(f"Unexpected open pressure monitor door payload: '{payload}'")
 
-    elif message.topic.matches(TOPIC_TRANSCRIPTION):
-        if measures_state == Measures.PRESSURE_START_MONITOR.index:
+        elif measures_state == Measures.PRESSURE_START_MONITOR.index:
             if payload.startswith("P1:OK"):
-                measures_state += 1
-                await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
+                #await client.publish(SCREEN SHOW RESULT)
                 await client.publish(TOPIC_CAM, 'START READING')
             elif payload.startswith("P1:ERR"):
                 log.warning("Start pressure monitor error.")
             else:
                 log.warning(f"Unexpected start pressure monitor payload: '{payload}'")
 
-    elif message.topic.matches(CAM_OUTPUT):
         elif measures_state == Measures.PRESSURE_CLOSE_DOOR.index:
             if payload.startswith("P2:OK"):
-                measures_state += 1
-            elif payload.startswith("P2:ERR"):
-                log.warning("Close pressure monitor door error.")
+                main_state = State.INTERVIEW
+                return True
+            elif payload.startswith("P1:ERR"):
+                log.warning("Start pressure monitor error.")
             else:
-                log.warning(f"Unexpected close pressure monitor door payload: '{payload}'")
+                log.warning(f"Unexpected start pressure monitor payload: '{payload}'")
+    
+    elif message.topic.matches(TOPIC_TRANSCRIPTION):
+        if payload == STT_FAIL_PAYLOAD:
+            log.warning(f"Mic_stt_service failed: '{payload}'")
+            return False #???
+        prompt = build_llm_prompt(payload, State(main_state))
+        await client.publish(TOPIC_PROMPT, prompt)
 
-        return True
+    elif message.topic.matches(LLM_RESPONSE):
+        if payload == LLM_CONTINUE_PAYLOAD:
+            await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
+        else:
+            log.warning(f"Unexpected start pressure monitor payload: '{payload}'")
+            await client.publish(MIC_START, MIC_START_PAYLOAD)
+            return False
 
-
+    if message.topic.matches(CAM_OUTPUT):
+        if payload.startswith("CAM:ERR"):
+            log.warning("Camera error during pressure measurement.")
+            return False
+        elif payload.startswith("CAM:OK"):
+            parts = payload.split(':')
+            systolic_pressure = int(parts[2])
+            diastolic_pressure = int(parts[3])
+            heart_rate = int(parts[4])
+            jsonPost["systolic_pressure"] = systolic_pressure
+            jsonPost["diastolic_pressure"] = diastolic_pressure
+            jsonPost["heart_rate"] = heart_rate
+            measures_state += 1
+            await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
+            await client.publish(MIC_START, MIC_START_PAYLOAD)
+    
          
         
         #processes_fw_output(payload)
@@ -300,12 +330,16 @@ async def run_interview_flow(client, message, payload):
         await client.publish(TOPIC_SPEAK, payload)
         
 def build_llm_prompt(message, status):
-    global dinamic_context, forms_state
+    global dinamic_context, forms_state, measure_context
     if status == State.FORMS:
         question = Forms.get_by_index(forms_state).question
         prompt = (process_answer_context + question + '\nAnswer:\n' + message + '\nOutput:')
         return prompt
-    if status == State.INTERVIEW:
+    elif status == State.MEASURES:
+        question = Measures.get_by_index(measures_state).speach
+        prompt = ("\n[Question]" + question + "\n[Patient]: "+ message)
+        return prompt
+    elif status == State.INTERVIEW:
         dinamic_context += "\n[Patient]: " + message
         return dinamic_context
 

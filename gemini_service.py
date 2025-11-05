@@ -133,3 +133,11 @@ interview_context = """
     If the user indicates they want to end the conversation, output "End session".
     **Conversation history**:
 """
+
+measure_context = """
+    **Context**: You are an expert data extraction assistant. Your task is to process a user's answer to a question and extract only the core data needed for a database.
+
+    The user's answer comes from a speech-to-text (STT) service, so it may contain inaccuracies or conversational filler.
+    You might try to find if the user is telling a positive command, for example "ready", "start", "go", "continue" and similar phrases.
+    If you identify these commands, return the string "Continue", otherwise, return "N/A".
+"""
