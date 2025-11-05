@@ -13,7 +13,7 @@ FW_INPUT = "fw/input"
 FW_OUTPUT = "fw/output"
 
 try:
-    ser = serial.Serial('/dev/ttyS0', 115200, timeout=1)
+    ser = serial.Serial('/dev/ttyS0', 115200, timeout=10)
     ser.flush()
     print("Serial port connected")
 except serial.SerialException as e:
@@ -23,17 +23,18 @@ except serial.SerialException as e:
 async def fw_communication(command: str) -> str:
     try:
         print('OXI') #DEBUG
-        logging.info("Sending command to firmware...")
         if command == 'TEMPERATURE':
-            command = 'T'
+            command = 'T\n'
         elif command == 'OXYMETER':
-            command = 'O'
+            command = 'O\n'
         elif command == 'PRESSURE_OPEN_DOOR':
-            command = 'P0'
+            command = 'P\n'
         elif command == 'PRESSURE_START_MONITOR':
-            command = 'P1'
+            command = 'P1\n'
         elif command == 'PRESSURE_CLOSE_DOOR':
-            command = 'P2'
+            command = 'P2\n'
+        logging.info(f"Sending command {command} to firmware ")
+        
         await asyncio.to_thread(ser.write, command.encode('ascii'))
         response_bytes = await asyncio.to_thread(ser.readline)
         """
@@ -52,6 +53,12 @@ async def fw_communication(command: str) -> str:
             return False
         """
         response = response_bytes.decode('utf-8').rstrip()
+        logging.info(f"Raw bytes received from FW: {response_bytes}") # <-- NOVO LOG
+        
+        if not response_bytes:
+            logging.warning("No response from firmware (timeout)")
+            return "FW_TIMEOUT" # Retorne um erro claro
+        
         print(f"[Pi <- FW] Response: {response}")
         return response
 
@@ -71,6 +78,7 @@ async def main():
                     command = message.payload.decode('utf-8')
                     logging.info(f"Received command: {command}")
                     response = await fw_communication(command)
+                    print("sending: " + response)
                     await client.publish(FW_OUTPUT, response)
                         
     except mqtt.exceptions.MqttError as e:
