@@ -125,11 +125,7 @@ async def main():
 
                 if Session.main_state == State.FORMS:
                     await run_forms_flow(client, message, payload, Session)
-                    if Session.main_state == State.MEASURES:
-                        await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
-                        #await client.publish(TOTEM SCREEN)
-                        await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
-
+                        
                 elif Session.main_state == State.MEASURES:
                     await run_measures_flow(client, message, payload, Session)
                     if Session.main_state == State.INTERVIEW:
@@ -143,16 +139,14 @@ async def main():
     except mqtt.MqttError as e:
         log.critical(f"Erro crítico de MQTT: {e}. Encerrando.")
     except KeyboardInterrupt:
-        log.info("Orquestrador encerrado pelo usuário.")
+        log.info("Service ended by user")
 
 async def run_forms_flow(client, message, payload, Session):
     if message.topic.matches(SPEAK_RESPONSE):
-        print('caiu')
         if payload != SPEAK_SUCCESS_PAYLOAD:
             log.warning(f"Audio_player_service failed: '{payload}'")
             return False #???
         await client.publish(MIC_START, MIC_START_PAYLOAD)
-        return True #???
             
     elif message.topic.matches(TOPIC_TRANSCRIPTION):
         if payload == STT_FAIL_PAYLOAD:
@@ -160,7 +154,6 @@ async def run_forms_flow(client, message, payload, Session):
             return False #???
         content = build_llm_prompt(payload, Session)
         await client.publish(TOPIC_PROMPT, content)
-        return True #???
 
     elif message.topic.matches(LLM_RESPONSE):
         if payload == LLM_FAIL_PAYLOAD:
@@ -169,20 +162,22 @@ async def run_forms_flow(client, message, payload, Session):
         elif payload == LLM_REPEAT_PAYLOAD:
             question = Forms.get_by_index(Session.forms_state).question
             await client.publish(TOPIC_SPEAK, question)
-            return True
+            return
         elif payload == LLM_END_PAYLOAD:
             #RESET ALL
             return False
         Session.jsonPost[Forms.get_by_index(Session.forms_state).name] = payload
         Session.forms_state += 9
         print('form state:', Session.forms_state)
-        if Session.forms_state >= 7: #DISEASES
+        if Session.forms_state >= len(Forms): #DISEASES
             Session.main_state = State.MEASURES
             print('Changing to MEASURES')
+            await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
+            #await client.publish(TOTEM SCREEN)
+            await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
         else:
             question = Forms.get_by_index(Session.forms_state).question
             await client.publish(TOPIC_SPEAK, question)
-        return True #???
 
 async def run_measures_flow(client, message, payload, Session):
     if message.topic.matches(FW_OUTPUT):
@@ -234,7 +229,6 @@ async def run_measures_flow(client, message, payload, Session):
                 await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
                 #VOICE COMMAND TO START MONITORING
                 print('COMANDO PARA INICIAR MONITORAMENTO DE PRESSAO')
-                await client.publish(MIC_START, MIC_START_PAYLOAD)
 
             elif payload.startswith("P0:ERR"):
                 log.warning("Open pressure monitor door error.")
@@ -276,7 +270,15 @@ async def run_measures_flow(client, message, payload, Session):
             await client.publish(MIC_START, MIC_START_PAYLOAD)
             return False
 
-    if message.topic.matches(CAM_OUTPUT):
+    elif message.topic.matches(SPEAK_RESPONSE):
+        if payload != SPEAK_SUCCESS_PAYLOAD:
+            log.warning(f"Audio_player_service falhou: '{payload}'")
+            return False #???
+        if Session.measures_state in [Measures.PRESSURE_OPEN_DOOR.index, 
+                                      Measures.PRESSURE_START_MONITOR.index]: 
+            await client.publish(MIC_START, MIC_START_PAYLOAD)
+    
+    elif message.topic.matches(CAM_OUTPUT):
         if payload.startswith("CAM:ERR"):
             log.warning("Camera error during pressure measurement.")
             return False
@@ -289,20 +291,13 @@ async def run_measures_flow(client, message, payload, Session):
             Session.jsonPost["diastolic_pressure"] = diastolic_pressure
             Session.jsonPost["heart_rate"] = heart_rate
             await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
-            await client.publish(MIC_START, MIC_START_PAYLOAD)
-    
-          
         
-        #processes_fw_output(payload)
-        #main_state = State.INTERVIEWS
-
 async def run_interview_flow(client, message, payload, Session):
     if message.topic.matches(SPEAK_RESPONSE):
         if payload != SPEAK_SUCCESS_PAYLOAD:
             log.warning(f"Audio_player_service falhou: '{payload}'")
             return False #???
         await client.publish(MIC_START, MIC_START_PAYLOAD)
-        return True #???
             
     elif message.topic.matches(TOPIC_TRANSCRIPTION):
         if payload == STT_FAIL_PAYLOAD:
