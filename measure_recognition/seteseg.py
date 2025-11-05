@@ -1,6 +1,6 @@
 import cv2
 
-img = cv2.imread("2025-11-01-130816.jpg")
+img = cv2.imread("2025-11-04-230628.jpg")
 height, width = img.shape[:2]
 center = (width/2, height/2)
 
@@ -86,7 +86,7 @@ for label, coords in digitos_coord.items():
     numero = ""
     for (x, y, w, h) in coords:
         dig_img = img[y:y+h, x:x+w]
-        numero += ler_digito(dig_img, img, x, y)
+        numero += ler_digito(dig_img, img_color, x, y)
         cv2.rectangle(img, (x, y), (x+w, y+h), (255, 255, 0), 1)  # amarelo = caixa do dígito
     valores[label] = numero
 
@@ -94,7 +94,7 @@ print("\nLeitura automática:")
 for k, v in valores.items():
     print(f"{k.capitalize()}: {v}")
 
-cv2.imwrite("debug_segmentos.png", img)
+cv2.imwrite("debug_segmentos.png", img_color)
 print("\nImagem de depuração salva: 'debug_segmentos.png'")
 
 
