@@ -9,6 +9,7 @@
 #define SERVO2_PIN 12
 #define RELE_PIN 14
 
+#define DEBUGMODE 1
 // Definição dos estados
 enum State {
     IDLE,
@@ -89,8 +90,14 @@ unsigned long releStartTime = 0;
 unsigned long lastBeat = 0;
 unsigned long lastPrintTime = 0;
 int sampleCount = 0;
+uint8_t try_count = 0;
 
 void setup(void) {
+
+    #if DEBUGMODE
+        Serial.println("Iniciando sistema...");
+    #endif
+
     Serial.begin(115200);
     
     // Inicializa I2C com os pinos customizados para o ESP32
@@ -99,14 +106,14 @@ void setup(void) {
     // Inicializa sensor MAX30102
     if (!sensor.begin()) {
         Serial.println("ERRO: Sensor MAX30102 não encontrado!");
-        while (1);
+        //while (1);
     }
     sensor.setup();
 
     // Inicializa MLX90614
     if (!mlx.begin()) {
         Serial.println("Erro: MLX90614 não encontrado!");
-        while (1);
+        //while (1);
     }
 
     // Inicializa Servos
@@ -116,12 +123,16 @@ void setup(void) {
     servo2.setPeriodHertz(50);
     servo1.attach(SERVO1_PIN);
     servo2.attach(SERVO2_PIN);
-    servo1.write(0);
+    servo1.write(130);
     servo2.write(0);
 
     // Inicializa Relé
     pinMode(RELE_PIN, OUTPUT);
     digitalWrite(RELE_PIN, LOW);
+
+    #if DEBUGMODE
+        Serial.println("Sistema Inicializado...");
+    #endif
 }
 
 float getMedian(std::vector<float>& samples) {
@@ -166,13 +177,16 @@ void processSerialCommands() {
 void loop() {
     processSerialCommands();
     unsigned long currentTime = millis();
-
-    switch (currentState) {
+    sensor.check();
+    switch (currentState) 
+    {
         case IDLE:
             // Nada a fazer, aguardando comandos
-            if (currentTime - lastPrintTime > 1000) {
+            if (currentTime - lastPrintTime > 5000) {
                 lastPrintTime = currentTime;
-                Serial.println("Waiting for commands...");
+                # if DEBUGMODE
+                    Serial.println("Waiting for commands...");
+                # endif
             }
             break;
 
@@ -192,70 +206,136 @@ void loop() {
             break;
 
         case SERVO1_FORWARD:
-            servo1.write(90);
+            servo1.write(40);
             delay(500); // Aguarda o servo se posicionar
             currentState = MEASURE_OXI;
+            //currentState = SERVO1_BACKWARD;
             oxiSamples.clear();
             sampleCount = 0;
             lastSampleTime = currentTime;
             break;
 
         case MEASURE_OXI:
-            if (currentTime - lastSampleTime >= 100) {
-                sensor.check();
-                
-                if (sensor.available()) {
+            sensor.check();
+            if (currentTime - lastSampleTime >= 100) 
+            {
+                if (sensor.available()) 
+                {
                     uint32_t irValue = sensor.getIR();
-                    uint32_t redValue = sensor.getRed();
+                    uint32_t redValue = sensor.getRed(); // Ler ambos os valores para os filtros
                     sensor.nextSample();
 
-                    // Processamento do SpO2
-                    int16_t IR_signal = pulseIR.ma_filter(pulseIR.dc_filter(irValue));
-                    int16_t Red_signal = pulseRed.ma_filter(pulseRed.dc_filter(redValue));
+                    // Lógica de detecção com histerese para evitar oscilação
+                    if (irValue < FINGER_OFF_THRESHOLD && fingerOnSensor) {
+                        fingerOnSensor = false;
+                        beatAvg = 0;
+                        SPO2 = 0;
+                        #if DEBUGMODE
+                            Serial.println("\nDedo removido. Aguardando...");
+                        #endif
+                    } else if (irValue > FINGER_ON_THRESHOLD && !fingerOnSensor) {
+                        fingerOnSensor = true;
+                        lastBeat = millis(); // Reseta o timer da batida quando o dedo é detectado
+                        #if DEBUGMODE
+                            Serial.println("Dedo detectado. Realizando medição...");
+                        #endif
+                    }
                     
-                    if (pulseIR.isBeat(IR_signal)) {
-                        pulseRed.isBeat(Red_signal);
-                        
-                        long beatInterval = currentTime - lastBeat;
-                        if (beatInterval > 600) {
-                            lastBeat = currentTime;
-                            
-                            long numerator = (pulseRed.avgAC() * pulseIR.avgDC()) / 256;
-                            long denominator = (pulseRed.avgDC() * pulseIR.avgAC()) / 256;
-                            int RX100 = (denominator > 0) ? (numerator * 100) / denominator : 999;
+                    if (fingerOnSensor) 
+                    {
+                        // Processamento do sinal para encontrar o batimento
+                        int16_t IR_signal = pulseIR.ma_filter(pulseIR.dc_filter(irValue));
+                        bool beatIR = pulseIR.isBeat(IR_signal);
 
-                            if (RX100 >= 0 && RX100 < 184) {
-                                oxiSamples.push_back(spo2_table[RX100]);
-                                sampleCount++;
+                        // *** CORREÇÃO PARA SpO2 ***
+                        // Processa o sinal vermelho da mesma forma, chamando isBeat() para forçar
+                        // o cálculo interno do valor AC (avgAC) na biblioteca.
+                        int16_t Red_signal = pulseRed.ma_filter(pulseRed.dc_filter(redValue));
+                        pulseRed.isBeat(Red_signal); // A chamada é necessária, mesmo sem usar o resultado.
+
+                        if (beatIR) 
+                        {
+                            long beatInterval = currentTime - lastBeat;
+                            
+                            if (beatInterval > 600) 
+                            { 
+                                lastBeat = currentTime;
+                                
+                                long btpm = 60000 / beatInterval;
+                                if (btpm > 40 && btpm < 200) {
+                                    beatAvg = bpm.filter((int16_t)btpm);
+                                }
+                                
+                                // Calcula o SpO2 somente quando temos um batimento válido
+                                long numerator = (pulseRed.avgAC() * pulseIR.avgDC()) / 256;
+                                long denominator = (pulseRed.avgDC() * pulseIR.avgAC()) / 256;
+                                int RX100 = (denominator > 0) ? (numerator * 100) / denominator : 999;
+
+                                if ((RX100 >= 0) && (RX100 < 184)) 
+                                {
+                                    SPO2 = spo2_table[RX100];
+                                    oxiSamples.push_back(SPO2);
+                                    sampleCount++;
+                                }
                             }
                         }
+
+                        // Imprime os valores no Monitor Serial a cada 1 segundo para não poluir o terminal
+                        lastPrintTime = currentTime;
+                        #if DEBUGMODE
+                            if (beatAvg > 0 && SPO2 > 0) 
+                            {
+                                Serial.print("BPM: ");
+                                Serial.print(beatAvg);
+                                Serial.print(" | SpO2: ");
+                                Serial.print(SPO2);
+                                Serial.println("%");
+                            }
+            
+                            if (sampleCount >= 5) 
+                            {
+                                int medianSPO2 = getMedianInt(oxiSamples);
+                                Serial.printf("O:OK:%d\n", medianSPO2);
+                                currentState = SERVO1_BACKWARD;
+                            }
+            
+                            if (currentTime - lastPrintTime > 1000) 
+                            {
+                                lastPrintTime = currentTime;
+                                #if DEBUGMODE
+                                    Serial.print("Measuring SpO2... Samples: ");
+                                    Serial.println(sampleCount);
+                                #endif
+                            }
+                        #endif
+                        lastSampleTime = currentTime;
                     }
+            
                 }
-
-                if (sampleCount >= 5) {
-                    int medianSPO2 = getMedianInt(oxiSamples);
-                    Serial.printf("O:OK:%d\n", medianSPO2);
-                    currentState = SERVO1_BACKWARD;
+                else
+                {
+                    sensor.check();
+                    #if DEBUGMODE
+                        if(try_count > 5)
+                        {   
+                            try_count = 0;
+                            Serial.println("WAIT....");
+                        }
+                        else
+                            try_count++;
+                    #endif
                 }
-
-                if (currentTime - lastPrintTime > 1000) {
-                    lastPrintTime = currentTime;
-                    Serial.print("Measuring SpO2... Samples: ");
-                    Serial.println(sampleCount);
-                }
-
-                lastSampleTime = currentTime;
             }
             break;
 
         case SERVO1_BACKWARD:
-            servo1.write(0);
+            servo1.write(130);
             delay(500);
             currentState = IDLE;
             break;
 
         case SERVO2_FORWARD:
-            servo2.write(90);
+            servo2.write(170);
             delay(500);
             Serial.println("P1:OK");
             currentState = IDLE;
@@ -269,99 +349,13 @@ void loop() {
             break;
 
         case RELE_CONTROL:
-            if (currentTime - releStartTime >= 100) {
+            if (currentTime - releStartTime >= 400) 
+            {
                 digitalWrite(RELE_PIN, LOW);
                 Serial.println("P:OK");
                 currentState = IDLE;
             }
             break;
     }
-
-  uint32_t irValue = sensor.getIR();
-  uint32_t redValue = sensor.getRed(); // Ler ambos os valores para os filtros
-  sensor.nextSample();
-
-  // Lógica de detecção com histerese para evitar oscilação
-  if (irValue < FINGER_OFF_THRESHOLD && fingerOnSensor) {
-    fingerOnSensor = false;
-    beatAvg = 0;
-    SPO2 = 0;
-    Serial.println("\nDedo removido. Aguardando...");
-  } else if (irValue > FINGER_ON_THRESHOLD && !fingerOnSensor) {
-    fingerOnSensor = true;
-    lastBeat = millis(); // Reseta o timer da batida quando o dedo é detectado
-    Serial.println("Dedo detectado. Realizando medição...");
-  }
-  /*
-  // Se o dedo estiver no sensor, processa os dados
-  if (fingerOnSensor) {
-    // Processamento do sinal para encontrar o batimento
-    int16_t IR_signal = pulseIR.ma_filter(pulseIR.dc_filter(irValue));
-    bool beatIR = pulseIR.isBeat(IR_signal);
-
-    // *** CORREÇÃO PARA SpO2 ***
-    // Processa o sinal vermelho da mesma forma, chamando isBeat() para forçar
-    // o cálculo interno do valor AC (avgAC) na biblioteca.
-    int16_t Red_signal = pulseRed.ma_filter(pulseRed.dc_filter(redValue));
-    pulseRed.isBeat(Red_signal); // A chamada é necessária, mesmo sem usar o resultado.
-
-    if (beatIR) {
-      long beatInterval = currentTime - lastBeat;
-      
-      if (beatInterval > 600) { 
-          lastBeat = currentTime;
-          
-          long btpm = 60000 / beatInterval;
-          if (btpm > 40 && btpm < 200) {
-            beatAvg = bpm.filter((int16_t)btpm);
-          }
-          
-          // Calcula o SpO2 somente quando temos um batimento válido
-          long numerator = (pulseRed.avgAC() * pulseIR.avgDC()) / 256;
-          long denominator = (pulseRed.avgDC() * pulseIR.avgAC()) / 256;
-          int RX100 = (denominator > 0) ? (numerator * 100) / denominator : 999;
-
-          if ((RX100 >= 0) && (RX100 < 184)) {
-            SPO2 = spo2_table[RX100];
-          }
-      }
-    }
-
-    // Imprime os valores no Monitor Serial a cada 1 segundo para não poluir o terminal
-    if (currentTime - lastPrintTime > 1000) {
-      lastPrintTime = currentTime;
-      if (beatAvg > 0 && SPO2 > 0) {
-        Serial.print("BPM: ");
-        Serial.print(beatAvg);
-        Serial.print(" | SpO2: ");
-        Serial.print(SPO2);
-        Serial.println("%");
-        
-        //--- Linhas de Debug (Comentadas) ---
-        //Serial.print(" | Ratio: ");
-        //Serial.print(lastRatio);
-        //Serial.print(" | Red_AC: ");
-        //Serial.print(lastRedAC);
-        //Serial.print(" | IR_AC: ");
-        //Serial.println(lastIrAC);
-        
-
-      } else {
-        Serial.println("Calculando..."); // Feedback para o usuário
-      }
-    }
-  } else {
-    Serial.print("Ambient temperature = "); 
-    Serial.print(mlx.readAmbientTempC());
-    Serial.print("°C");      
-    Serial.print("   ");
-    Serial.print("Object temperature = "); 
-    Serial.print(mlx.readObjectTempC()); 
-    Serial.println("°C");
-
-    Serial.println("-----------------------------------------------------------------");
-    // Quando não há dedo, apenas aguarda. A lógica de sleep foi removida.
-    delay(100);
-  }*/
 }
 
