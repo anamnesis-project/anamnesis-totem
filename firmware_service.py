@@ -22,16 +22,25 @@ except serial.SerialException as e:
 
 async def fw_communication(command: str) -> str:
     try:
+        print('OXI') #DEBUG
         logging.info("Sending command to firmware...")
-        await asyncio.to_thread(ser.write, command.encode('ascii'))
-        
-        response_bytes = await asyncio.to_thread(ser.readline)
+        #await asyncio.to_thread(ser.write, command.encode('ascii'))
+        if command == 'TEMPERATURE':
+            response_bytes = b'T:OK:36.4\n'#await asyncio.to_thread(ser.readline)
+        elif command == 'OXYMETER':
+            response_bytes = b'O:OK:98\n'
+        elif command == 'PRESSURE_OPEN_DOOR':
+            response_bytes = b'P0:OK:DOOR_OPENED\n'
+        elif command == 'PRESSURE_START_MONITOR':
+            response_bytes = b'P1:OK:MONITORING_STARTED\n'
+        elif command == 'PRESSURE_CLOSE_DOOR':
+            response_bytes = b'P2:OK:DOOR_CLOSED\n'
         if not response_bytes:
             logging.warning("No response from firmware")
             return False
         response = response_bytes.decode('utf-8').rstrip()
         print(f"[Pi <- FW] Response: {response}")
-        return json.loads(response)
+        return response
 
     except Exception as e:
         logging.error(f"Error communication with FW: {e}")
@@ -48,7 +57,7 @@ async def main():
                 if message.topic.matches(FW_INPUT):
                     command = message.payload.decode('utf-8')
                     logging.info(f"Received command: {command}")
-                    response = 'FAILED'#await fw_communication(command)
+                    response = await fw_communication(command)
                     await client.publish(FW_OUTPUT, response)
                         
     except mqtt.exceptions.MqttError as e:

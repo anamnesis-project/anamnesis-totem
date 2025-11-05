@@ -4,6 +4,7 @@ from gemini_service import process_answer_context, interview_context, measure_co
 from enum import Enum
 import os
 import logging
+import requests
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,7 +43,7 @@ FW_FAIL_PAYLOAD = "failed"
 LLM_FAIL_PAYLOAD = "failed"
 
 class Forms(Enum):
-    AGE = (0, "Hi, I am Anna, I'm a virtual assistant and I'm here to collect some information to speed up your check-in. Please, answer my questions and follow my instructions. Tell me, how old are you?")
+    AGE = (0, "Hi, I am Anna")#, I'm a virtual assistant and I'm here to collect some information to speed up your check-in. Please, answer my questions and follow my instructions. Tell me, how old are you?")
     SEX = (1, "What is your biological sex?")
     HEIGHT = (2, "What is your height in centimeters?")
     WEIGHT = (3, "What is your weight in kilograms?")
@@ -109,6 +110,7 @@ async def main():
             await client.subscribe(FW_OUTPUT)
             await client.subscribe(LLM_RESPONSE)
             await client.subscribe(TOPIC_DB_RESPONSE)
+            await client.subscribe(CAM_OUTPUT)
             log.info(f"Connected to Broker {MQTT_BROKER}.")
             question = Forms.get_by_index(forms_state).question
             await client.publish(TOPIC_SPEAK, question)
@@ -172,7 +174,7 @@ async def run_forms_flow(client, message, payload):
             #RESET ALL
             return False
         jsonPost[Forms.get_by_index(forms_state).name] = message
-        forms_state += 1
+        forms_state += 9
         print('form state:', forms_state)
         if forms_state >= 7: #DISEASES
             main_state = State.MEASURES
@@ -185,6 +187,7 @@ async def run_forms_flow(client, message, payload):
 async def run_measures_flow(client, message, payload):
     global main_state, measures_state
     if message.topic.matches(FW_OUTPUT):
+        print('caiu fw: ' + str(measures_state))
         if payload == FW_FAIL_PAYLOAD:
             log.warning(f"Firmware_service failed: '{payload}'")
             return False #???
@@ -216,7 +219,7 @@ async def run_measures_flow(client, message, payload):
                     log.info(f"Oxymeter recorded: {value}%")
                     measures_state += 1
                     #await client.publish(TOPIC_SCREEN, NEXT_STEP)
-                    await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
+                    #await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
                     await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
                 except (IndexError, ValueError):
                     log.warning(f"Invalid oxymeter '{payload}'")
@@ -227,11 +230,13 @@ async def run_measures_flow(client, message, payload):
 
         elif measures_state == Measures.PRESSURE_OPEN_DOOR.index: 
             if payload.startswith("P0:OK"): #SUCCESS OPEN DOOR
-                measures_state += 1
+                print('abriu')
                 #await client.publish(SCREEN SHOW RESULT)
                 await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
                 #VOICE COMMAND TO START MONITORING
+                print('COMANDO PARA INICIAR MONITORAMENTO DE PRESSAO')
                 await client.publish(MIC_START, MIC_START_PAYLOAD)
+
             elif payload.startswith("P0:ERR"):
                 log.warning("Open pressure monitor door error.")
             else:
@@ -239,6 +244,7 @@ async def run_measures_flow(client, message, payload):
 
         elif measures_state == Measures.PRESSURE_START_MONITOR.index:
             if payload.startswith("P1:OK"):
+                print('CAIU CAM')
                 #await client.publish(SCREEN SHOW RESULT)
                 await client.publish(TOPIC_CAM, 'START READING')
             elif payload.startswith("P1:ERR"):
@@ -264,6 +270,7 @@ async def run_measures_flow(client, message, payload):
 
     elif message.topic.matches(LLM_RESPONSE):
         if payload == LLM_CONTINUE_PAYLOAD:
+            measures_state += 1
             await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
         else:
             log.warning(f"Unexpected start pressure monitor payload: '{payload}'")
@@ -282,7 +289,6 @@ async def run_measures_flow(client, message, payload):
             jsonPost["systolic_pressure"] = systolic_pressure
             jsonPost["diastolic_pressure"] = diastolic_pressure
             jsonPost["heart_rate"] = heart_rate
-            measures_state += 1
             await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
             await client.publish(MIC_START, MIC_START_PAYLOAD)
     
@@ -305,8 +311,9 @@ async def run_interview_flow(client, message, payload):
             log.warning(f"Mic_stt_service failed: '{payload}'")
             return False #???
         interview.append(payload)
-        if len(interview)/2 >= 10:
+        if len(interview)/2 >= 1:
             a=1 #STOP
+            insert_cli(jsonPost, interview)
         prompt = build_llm_prompt(payload, State(main_state))
         await client.publish(TOPIC_PROMPT, prompt)
         return True #???
@@ -337,13 +344,39 @@ def build_llm_prompt(message, status):
         return prompt
     elif status == State.MEASURES:
         question = Measures.get_by_index(measures_state).speach
-        prompt = ("\n[Question]" + question + "\n[Patient]: "+ message)
+        prompt = (measure_context + "\n[Question]" + question + "\n[Patient]: "+ message)
+        print("prompt: " + prompt)
         return prompt
     elif status == State.INTERVIEW:
         dinamic_context += "\n[Patient]: " + message
         return dinamic_context
 
-#def insert_db(client, information, payload):
+def insert_cli(jsonPost, interview):
+    url = 'https://kickless-untaxing-neil.ngrok-free.dev/reports'
+    i_list = []
+    for i in interview:
+        i_list.append(i)
+    requestBody = {
+        "patient": {
+            "name": "Luis Inacio",
+            "cpf": "13131313131",
+            "dateOfBirth": "1950-01-13",
+            "sex": "F",
+        },
+        "weight": 68,
+        "height": 169,
+        "heartRate": jsonPost["heart_rate"],
+        "systolicPressure": jsonPost['systolic_pressure'],
+        "diastolicPressure": jsonPost['diastolic_pressure'],
+        "temperature": jsonPost['temperature'],
+        "oxygenSaturation": jsonPost['oxygen_saturation'],
+        "interview": [{
+        "question": "isso eh uma pergunta",
+        "answer": "isso eh uma resposta"
+        }]
+    }
+    response = requests.post(url, json=requestBody)
+    print(response)
 
 if __name__ == "__main__":
     try:
