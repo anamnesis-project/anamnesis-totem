@@ -43,7 +43,7 @@ FW_FAIL_PAYLOAD = "failed"
 LLM_FAIL_PAYLOAD = "failed"
 
 class Forms(Enum):
-    AGE = (0, "Hi, I am Anna")#, I'm a virtual assistant and I'm here to collect some information to speed up your check-in. Please, answer my questions and follow my instructions. Tell me, how old are you?")
+    AGE = (0, "Hi, I am Anna, I'm a virtual assistant and I'm here to collect some information to speed up your check-in. Please, answer my questions and follow my instructions. Tell me, how old are you?")
     SEX = (1, "What is your biological sex?")
     HEIGHT = (2, "What is your height in centimeters?")
     WEIGHT = (3, "What is your weight in kilograms?")
@@ -352,7 +352,7 @@ def insert_cli(jsonPost, interview):
         "patient": {
             "name": "Luis Inacio",
             "cpf": "13131313131",
-            "dateOfBirth": "1950-01-13",
+            "dateOfBirth": "2000-01-13T00:00:00",
             "sex": "F",
         },
         "weight": 68,

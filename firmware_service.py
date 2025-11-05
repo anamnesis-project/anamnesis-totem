@@ -24,7 +24,19 @@ async def fw_communication(command: str) -> str:
     try:
         print('OXI') #DEBUG
         logging.info("Sending command to firmware...")
-        #await asyncio.to_thread(ser.write, command.encode('ascii'))
+        if command == 'TEMPERATURE':
+            command = 'T'
+        elif command == 'OXYMETER':
+            command = 'O'
+        elif command == 'PRESSURE_OPEN_DOOR':
+            command = 'P0'
+        elif command == 'PRESSURE_START_MONITOR':
+            command = 'P1'
+        elif command == 'PRESSURE_CLOSE_DOOR':
+            command = 'P2'
+        await asyncio.to_thread(ser.write, command.encode('ascii'))
+        response_bytes = await asyncio.to_thread(ser.readline)
+        """
         if command == 'TEMPERATURE':
             response_bytes = b'T:OK:36.4\n'#await asyncio.to_thread(ser.readline)
         elif command == 'OXYMETER':
@@ -38,6 +50,7 @@ async def fw_communication(command: str) -> str:
         if not response_bytes:
             logging.warning("No response from firmware")
             return False
+        """
         response = response_bytes.decode('utf-8').rstrip()
         print(f"[Pi <- FW] Response: {response}")
         return response
