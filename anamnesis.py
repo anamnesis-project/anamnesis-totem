@@ -27,8 +27,8 @@ MIC_STOP = "voice/mic_stt/stop"
 TOPIC_TRANSCRIPTION = "voice/mic_stt/transcription" 
 TOPIC_DB_REQUEST = "db/request" 
 TOPIC_DB_RESPONSE = "db/response"
-TOPIC_CAM = "camera/input"
-CAM_OUTPUT = "camera/output"
+TOPIC_CAM = "cam/input"
+CAM_OUTPUT = "cam/output"
 
 
 SPEAK_SUCCESS_PAYLOAD = "ok"
