@@ -2,6 +2,7 @@ import asyncio
 import aiomqtt as mqtt
 from gemini_service import process_answer_context, interview_context, measure_context
 from enum import Enum
+import json
 import os
 import logging
 import requests
@@ -223,14 +224,14 @@ async def run_measures_flow(client, message, payload, Session):
                 log.warning(f"Unexpected oxymeter payload: '{payload}'")
 
         elif Session.measures_state == Measures.PRESSURE_OPEN_DOOR.index: 
-            if payload.startswith("P0:OK"): #SUCCESS OPEN DOOR
+            if payload.startswith("P:OK"): #SUCCESS OPEN DOOR
                 print('abriu')
                 #await client.publish(SCREEN SHOW RESULT)
                 await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
                 #VOICE COMMAND TO START MONITORING
                 print('COMANDO PARA INICIAR MONITORAMENTO DE PRESSAO')
 
-            elif payload.startswith("P0:ERR"):
+            elif payload.startswith("P:ERR"):
                 log.warning("Open pressure monitor door error.")
             else:
                 log.warning(f"Unexpected open pressure monitor door payload: '{payload}'")
@@ -367,6 +368,7 @@ def insert_cli(jsonPost, interview):
         "answer": "isso eh uma resposta"
         }]
     }
+    print(json.dumps(requestBody, indent=4))
     response = requests.post(url, json=requestBody)
     print(response)
 
