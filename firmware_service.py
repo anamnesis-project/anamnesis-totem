@@ -34,7 +34,7 @@ async def fw_communication(command: str) -> str:
         elif command == 'PRESSURE_CLOSE_DOOR':
             command = 'P2\n'
         logging.info(f"Sending command {command} to firmware ")
-        
+        await asyncio.to_thread(ser.reset_input_buffer)
         await asyncio.to_thread(ser.write, command.encode('ascii'))
         response_bytes = await asyncio.to_thread(ser.readline)
         """
