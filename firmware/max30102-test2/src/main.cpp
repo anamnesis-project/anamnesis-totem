@@ -119,8 +119,8 @@ void setup(void) {
     // Inicializa Servos
     ESP32PWM::allocateTimer(0);
     ESP32PWM::allocateTimer(1);
-    servo1.setPeriodHertz(50);
-    servo2.setPeriodHertz(50);
+    servo1.setPeriodHertz(100);
+    servo2.setPeriodHertz(100);
     servo1.attach(SERVO1_PIN);
     servo2.attach(SERVO2_PIN);
     servo1.write(130);
@@ -329,6 +329,8 @@ void loop() {
             break;
 
         case SERVO1_BACKWARD:
+            Serial.println("Retire o o dedo do sensor.");
+            delay(800);
             servo1.write(130);
             delay(500);
             currentState = IDLE;

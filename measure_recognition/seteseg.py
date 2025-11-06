@@ -1,6 +1,6 @@
 import cv2
 
-img = cv2.imread("2025-11-04-230628.jpg")
+img = cv2.imread("2025-11-06-165701.jpg")
 height, width = img.shape[:2]
 center = (width/2, height/2)
 
@@ -10,7 +10,7 @@ img = cv2.warpAffine(img, rotation_matrix, (width, height))
 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 cv2.imwrite("saida_gray.png", img)
 img_color = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-blur = cv2.GaussianBlur(img, (11, 11), 0)
+blur = cv2.GaussianBlur(img, (7, 7), 0)
 img = cv2.adaptiveThreshold(
     blur, 255,
     cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -36,7 +36,8 @@ DIGITOS = {
     (1,0,0,1,1,1,0): 'C',
     (0,1,1,1,1,0,1): 'd',
     (1,0,0,1,1,1,1): 'E',
-    (1,0,0,0,1,1,1): 'F'
+    (1,0,0,0,1,1,1): 'F',
+    (1,1,0,0,1,1,1): 'P',
 }
 
 def ler_digito(dig_img, debug_img, x0, y0):
@@ -75,9 +76,9 @@ def ler_digito(dig_img, debug_img, x0, y0):
 
 # --- Coordenadas fixas dos dígitos (x, y, w, h) ---
 digitos_coord = {
-    "sistolica": [(285, 48, 33, 60), (330, 48, 33, 60), (375, 47, 33, 60)],
-    "diastolica": [(332, 118, 33, 60), (374, 116, 33, 60)],
-    "pulso": [(353, 193, 22, 45), (382, 191, 22, 45)]
+    "sistolica": [(218, 180, 33, 60), (262, 180, 33, 60), (304, 180, 33, 60)],
+    "diastolica": [(264, 246, 33, 60), (305, 246, 33, 60)],
+    "pulso": [(286, 320, 22, 45), (316, 320, 22, 45)]
 }
 
 # --- Processar cada grupo ---
