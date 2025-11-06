@@ -4,6 +4,7 @@ from gemini_service import process_answer_context, interview_context, measure_co
 from enum import Enum
 import os
 import logging
+import json
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,6 +28,8 @@ TOPIC_DB_REQUEST = "db/request"
 TOPIC_DB_RESPONSE = "db/response"
 TOPIC_CAM = "camera/input"
 CAM_OUTPUT = "camera/output"
+UI_SEND = "ui/send"
+UI_RECEIVE = "ui/receive"
 
 
 SPEAK_SUCCESS_PAYLOAD = "ok"
@@ -42,22 +45,28 @@ FW_FAIL_PAYLOAD = "failed"
 LLM_FAIL_PAYLOAD = "failed"
 
 class Forms(Enum):
-    AGE = (0, "Hi, I am Anna, I'm a virtual assistant and I'm here to collect some information to speed up your check-in. Please, answer my questions and follow my instructions. Tell me, how old are you?")
-    SEX = (1, "What is your biological sex?")
-    HEIGHT = (2, "What is your height in centimeters?")
-    WEIGHT = (3, "What is your weight in kilograms?")
-    OCCUPATION = (4, "What is your occupation?")
-    MEDICATIONS = (5, "Are you taking any medications? If so, please list them.")
-    ALLERGIES = (6, "Do you have any known allergies? If so, please list them.")
-    DISEASES = (7, "Do you have any chronic illnesess? If so, please list them.")
+    NAME = (0, "name", "Hi, I am Anna, I'm a virtual assistant and I'm here to collect some information to speed up your check-in. Please, answer my questions and follow my instructions. Tell me, What is your name?")
+    CPF = (1, "cpf", "What is your CPF?")
+    AGE = (2, "age", "How old are you?")
+    SEX = (3, "sex", "What is your biological sex?")
+    HEIGHT = (4, "height", "What is your height in centimeters?")
+    WEIGHT = (5, "weight", "What is your weight in kilograms?")
+    OCCUPATION = (6, "occupation", "What is your occupation?")
+    MEDICATIONS = (7, "medications", "Are you taking any medications? If so, please list them.")
+    ALLERGIES = (8, "allergies", "Do you have any known allergies? If so, please list them.")
+    DISEASES = (9, "diseases", "Do you have any chronic illnesess? If so, please list them.")
 
     @property
     def index(self):
         return self.value[0]
 
     @property
-    def question(self):
+    def step(self):
         return self.value[1]
+
+    @property
+    def question(self):
+        return self.value[2]
     
     @classmethod
     def get_by_index(cls, index):
@@ -66,19 +75,23 @@ class Forms(Enum):
                 return member
 
 class Measures(Enum):
-    TEMPERATURE = (0, "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen.")
-    OXYMETER = (1, "Please, put your finger on the oxymeter as shown on the screen.")
-    PRESSURE_OPEN_DOOR = (2, "Please, grab the cuff inside the totem and place it on your bare arm, and tell me when you are Im ready...")
-    PRESSURE_START_MONITOR = (3, "Please put the cuff back in the cabinet and tell me when it is done")
-    PRESSURE_CLOSE_DOOR = (4, "")
+    TEMPERATURE = (0, "temperature", "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen.")
+    OXYMETER = (1, "oxymeter", "Please, put your finger on the oxymeter as shown on the screen.")
+    PRESSURE_OPEN_DOOR = (2, "pressure", "Please, grab the cuff inside the totem and place it on your bare arm, and tell me when you are Im ready...")
+    PRESSURE_START_MONITOR = (3, "pressure", "Please put the cuff back in the cabinet and tell me when it is done")
+    PRESSURE_CLOSE_DOOR = (4, "pressure", "")
 
     @property
     def index(self):
         return self.value[0]
 
     @property
-    def speach(self):
+    def step(self):
         return self.value[1]
+
+    @property
+    def speach(self):
+        return self.value[2]
     
     @classmethod
     def get_by_index(cls, index):
@@ -87,12 +100,13 @@ class Measures(Enum):
                 return member
 
 class State(Enum):
-    FORMS = 0
-    MEASURES = 1
-    INTERVIEW = 2
-    IDLE = 3
+    FORMS = 1
+    MEASURES = 2
+    INTERVIEW = 3
+    IDLE = 4
 
-main_state = State.FORMS
+main_state = State.IDLE
+id_collected = False
 forms_state = 0
 measures_state = 0
 jsonPost = {}
@@ -100,7 +114,7 @@ interview = []
 dinamic_context = interview_context
 
 async def main():
-    global main_state, dinamic_context
+    global main_state, dinamic_context, id_collected, forms_state, measures_state, jsonPost, interview
     try:
         async with mqtt.Client(MQTT_BROKER, port=MQTT_PORT) as client:
             
@@ -109,6 +123,7 @@ async def main():
             await client.subscribe(FW_OUTPUT)
             await client.subscribe(LLM_RESPONSE)
             await client.subscribe(TOPIC_DB_RESPONSE)
+            await client.subscribe(UI_RECEIVE)
             log.info(f"Connected to Broker {MQTT_BROKER}.")
             question = Forms.get_by_index(forms_state).question
             await client.publish(TOPIC_SPEAK, question)
@@ -120,10 +135,32 @@ async def main():
                     log.warning(f"Non UTF8 message got from {message.topic}")
                     continue
 
+                if message.topic.matches(UI_RECEIVE):
+                    ui_message = json.loads(payload)
+                    if ui_message["type"] == "command":
+                        if ui_message["action"] == "start" and main_state == State.IDLE:
+                            main_state = State.FORMS
+                            await ui_start(client)
+                        if ui_message["action"] == "cancel":
+                            main_state = State.IDLE
+                            id_collected = False
+                            forms_state = 0
+                            measures_state = 0
+                            jsonPost = {}
+                            interview = []
+                            await ui_cancel(client)
+                    else:
+                        jsonPost[ui_message["type"]] = ui_message["value"]
+                        if ui_message["cpf"] and main_state == State.FORMS:
+                            main_state = State.FORMS
+
                 if main_state == State.FORMS:
                     await run_forms_flow(client, message, payload)
                     if main_state == State.MEASURES:
-                        await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
+                        speach = Measures.get_by_index(measures_state).speach
+                        step = Measures.get_by_index(measures_state).step
+                        await ui_send_state(client, "measures", speach, step)
+                        await client.publish(TOPIC_SPEAK, speach)
                         #await client.publish(TOTEM SCREEN)
                         await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
                     
@@ -132,6 +169,7 @@ async def main():
                     if main_state == State.INTERVIEW:
                         interview.append(FIRST_QUESTION)
                         dinamic_context += "\n[You]: " + FIRST_QUESTION
+                        await ui_send_state(client, "interview", FIRST_QUESTION)
                         await client.publish(TOPIC_SPEAK, FIRST_QUESTION)
 
                 elif main_state == State.INTERVIEW:
@@ -179,6 +217,8 @@ async def run_forms_flow(client, message, payload):
             print('Changing to MEASURES')
         else:
             question = Forms.get_by_index(forms_state).question
+            step = Forms.get_by_index(formst_state).step
+            await ui_send_state(client, "forms", question, step)
             await client.publish(TOPIC_SPEAK, question)
         return True #???
 
@@ -197,7 +237,10 @@ async def run_measures_flow(client, message, payload):
                     log.info(f"Temperature recorded: {value}°C")
                     measures_state += 1
                     #await client.publish(TOPIC_SCREEN, NEXT_STEP)
-                    await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
+                    speach = Measures.get_by_index(measures_state).speach
+                    step = Measures.get_by_index(measures_state).step
+                    await ui_send_state(client, "measures", speach, step)
+                    await client.publish(TOPIC_SPEAK, speach)
                     await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
 
                 except (IndexError, ValueError):
@@ -216,7 +259,10 @@ async def run_measures_flow(client, message, payload):
                     log.info(f"Oxymeter recorded: {value}%")
                     measures_state += 1
                     #await client.publish(TOPIC_SCREEN, NEXT_STEP)
-                    await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
+                    speach = Measures.get_by_index(measures_state).speach
+                    step = Measures.get_by_index(measures_state).step
+                    await ui_send_state(client, "measures", speach, step)
+                    await client.publish(TOPIC_SPEAK, speach)
                     await client.publish(FW_INPUT, Measures.get_by_index(measures_state).name)
                 except (IndexError, ValueError):
                     log.warning(f"Invalid oxymeter '{payload}'")
@@ -229,7 +275,10 @@ async def run_measures_flow(client, message, payload):
             if payload.startswith("P0:OK"): #SUCCESS OPEN DOOR
                 measures_state += 1
                 #await client.publish(SCREEN SHOW RESULT)
-                await client.publish(TOPIC_SPEAK, Measures.get_by_index(measures_state).speach)
+                speach = Measures.get_by_index(measures_state).speach
+                step = Measures.get_by_index(measures_state).step
+                await ui_send_state(client, "measures", speach, step)
+                await client.publish(TOPIC_SPEAK, speach)
                 #VOICE COMMAND TO START MONITORING
                 await client.publish(MIC_START, MIC_START_PAYLOAD)
             elif payload.startswith("P0:ERR"):
@@ -317,6 +366,7 @@ async def run_interview_flow(client, message, payload):
             return False #???
         elif payload == LLM_REPEAT_PAYLOAD:
             question = Forms.get_by_index(forms_state).question
+            await ui_send_state(client, "interview", question)
             await client.publish(TOPIC_SPEAK, question)
             return True
         elif payload == LLM_END_PAYLOAD:
@@ -327,6 +377,7 @@ async def run_interview_flow(client, message, payload):
             main_state = State.IDLE
         interview.append(payload)
         dinamic_context += "\n[You]: " + payload
+        # TODO is this correct??
         await client.publish(TOPIC_SPEAK, payload)
         
 def build_llm_prompt(message, status):
@@ -344,6 +395,22 @@ def build_llm_prompt(message, status):
         return dinamic_context
 
 #def insert_db(client, information, payload):
+
+async def ui_start(client):
+    await ui_send_state(client, "forms", "What is your name?")
+
+async def ui_cancel(client):
+    await client.publish()
+
+async def ui_send_state(client, state, msg, step=""):
+    payload = {
+        "type": "state",
+        "state": state,
+        "msg": msg,
+        "step": step
+    }
+    output_string = json.dumps(payload)
+    await client.publish(UI_SEND, output_string)
 
 if __name__ == "__main__":
     try:

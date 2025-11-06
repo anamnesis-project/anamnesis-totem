@@ -1,9 +1,20 @@
-from asyncio import current_task
+import asyncio
+import aiomqtt as mqtt
+import logging
 from os import path
 from flask import Flask, send_from_directory
 from flask_socketio import SocketIO
 import json
 from enum import Enum
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+MQTT_BROKER = "localhost"
+MQTT_PORT = 1883
+UI_SEND = "ui/send"
+UI_RECEIVE = "ui/receive"
+
+mqtt_client = None
 
 class States(Enum):
     IDLE        = "idle"
@@ -48,8 +59,12 @@ def handle_disconnect():
     print("client disconnected")
 
 @socketio.on("client_message")
-def handle_receive(msg):
+async def handle_receive(msg):
+    global mqtt_client
     print("message received", msg)
+    if mqtt_client is not None:
+        await mqtt_client.publish(UI_RECEIVE, msg)
+
     data = json.loads(msg)
     match data["type"]:
         case "command":
@@ -122,7 +137,29 @@ def receive_cpf(cpf):
     print("name:", cpf)
     # TODO implement
 
-if __name__ == '__main__':
+async def main():
+    try:
+        async with mqtt.Client(MQTT_BROKER, port=MQTT_PORT) as client:
+            logging.info(f"Conected to MQTT Broker: {MQTT_BROKER}.")
+            await client.subscribe(UI_SEND)
+
+            global mqtt_client
+            mqtt_client = client
+
+            logging.info("waiting for message...")
+            async for message in client.messages:
+                if message.topic.matches(UI_SEND):
+                    socketio.emit("server_message", message.payload)
+                elif message.topic.matches(UI_RECEIVE):
+                    await client.publish(UI_RECEIVE)
+
+    except mqtt.exceptions.MqttError as e:
+        logging.critical(f"ERROR: Could not connecto to MQTT at {MQTT_BROKER}:{MQTT_PORT}.")
+        logging.critical(f"Detail: {e}")
+
     print("Starting server on port 5000")
     socketio.run(app, host='0.0.0.0', port=5000)
+
+if __name__ == '__main__':
+    asyncio.run(main())
 
