@@ -367,9 +367,11 @@ def insert_cli(jsonPost, interview):
         "diastolicPressure": jsonPost['diastolic_pressure'],
         "temperature": jsonPost['temperature'],
         "oxygenSaturation": jsonPost['oxygen_saturation'],
+        "medications": [med.strip() for med in jsonPost["MEDICATIONS"].split(',')],
+        "allergies": [allg.strip() for allg in jsonPost["ALLERGIES"].split(',')],
+        "diseases": [dis.strip() for dis in jsonPost["DISEASES"].split(',')],
         "interview": i_list
     }
-    print(json.dumps(requestBody, indent=4))
     response = requests.post(url, json=requestBody)
     print(response)
 
