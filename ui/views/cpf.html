@@ -1,0 +1,18 @@
+<div class="container">
+    <p id="msg"></p>
+    <form id="cpfForm" onsubmit="sendName()">
+        <input
+            id="cpfInput"
+            type="text"
+            inputmode="numeric"
+            maxlength="11"
+            placeholder="000.000.000-00"
+            autocomplete="off"
+        />
+        <button id="startButton" type="submit">Send</button>
+    </form>
+</div>
+
+<footer>
+    <button id="cancelButton" onclick="sendCancel()">Cancel</button>
+</footer>
