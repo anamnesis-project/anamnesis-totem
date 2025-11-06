@@ -168,7 +168,7 @@ async def run_forms_flow(client, message, payload, Session):
             #RESET ALL
             return False
         Session.jsonPost[Forms.get_by_index(Session.forms_state).name] = payload
-        Session.forms_state += 9
+        Session.forms_state += 1
         print('form state:', Session.forms_state)
         if Session.forms_state >= len(Forms): #DISEASES
             Session.main_state = State.MEASURES
@@ -347,26 +347,27 @@ def build_llm_prompt(message, Session):
 def insert_cli(jsonPost, interview):
     url = 'https://kickless-untaxing-neil.ngrok-free.dev/reports'
     i_list = []
-    for i in interview:
-        i_list.append(i)
+    for i in range(0, len(interview), 2):
+        item = {
+            "question": interview[i],
+            "answer": interview[i+1]
+        }
+        i_list.append(item)
     requestBody = {
         "patient": {
             "name": "Luis Inacio",
             "cpf": "13131313131",
-            "dateOfBirth": "2000-01-13T00:00:00",
-            "sex": "F",
+            "dateOfBirth": "2000-01-13T00:00:00Z",
+            "sex": jsonPost["SEX"],
         },
-        "weight": 68,
-        "height": 169,
+        "weight": jsonPost["WEIGHT"],
+        "height": jsonPost["HEIGHT"],
         "heartRate": jsonPost["heart_rate"],
         "systolicPressure": jsonPost['systolic_pressure'],
         "diastolicPressure": jsonPost['diastolic_pressure'],
         "temperature": jsonPost['temperature'],
         "oxygenSaturation": jsonPost['oxygen_saturation'],
-        "interview": [{
-        "question": "isso eh uma pergunta",
-        "answer": "isso eh uma resposta"
-        }]
+        "interview": i_list
     }
     print(json.dumps(requestBody, indent=4))
     response = requests.post(url, json=requestBody)
