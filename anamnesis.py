@@ -98,7 +98,31 @@ class SessionState:
         self.main_state = State.FORMS
         self.forms_state = 0
         self.measures_state = 0
-        self.jsonPost = {}
+        self.jsonPost = {
+            "patient": {
+                "name": "Luis Inacio",
+                "cpf": "11111111111",
+                "dateOfBirth": "2000-01-13T00:00:00Z",
+                "sex": "M"
+            },
+            "weight": 10,
+            "height": 99,
+            "heartRate": 66,
+            "systolicPressure": 12,
+            "diastolicPressure": 8,
+            "temperature": 36.5,
+            "oxygenSaturation": 98,
+            "occupation": "student",
+            "medications": [],
+            "allergies": ["eggs"],
+            "diseases": ["dengue", "chikungunya"],
+            "interview": [
+                {
+                    "question": "What brings you here today?",
+                    "answer": "im feeling week"
+                }
+            ]
+        }
         self.interview = []
         self.dinamic_context = interview_context
 
@@ -353,24 +377,36 @@ def insert_cli(jsonPost, interview):
             "answer": interview[i+1]
         }
         i_list.append(item)
+    age = jsonPost.get("AGE")
+    date_of_birth = f"{age}T00:00:00Z" if age else None
+    weight_val = jsonPost.get("WEIGHT")
+    weight = int(weight_val) if weight_val is not None else None
+    height_val = jsonPost.get("HEIGHT")
+    height = int(height_val) if height_val is not None else None
+    meds_str = jsonPost.get("MEDICATIONS")
+    medications = [med.strip() for med in meds_str.split(',')] if meds_str else None
+    allergies_str = jsonPost.get("ALLERGIES")
+    allergies = [allg.strip() for allg in allergies_str.split(',')] if allergies_str else None
+    diseases_str = jsonPost.get("DISEASES")
+    diseases = [dis.strip() for dis in diseases_str.split(',')] if diseases_str else None
     requestBody = {
         "patient": {
             "name": "Luis Inacio",
             "cpf": "11111111111",
-            "dateOfBirth": jsonPost["AGE"]+"T00:00:00Z",
-            "sex": jsonPost["SEX"],
+            "dateOfBirth": date_of_birth,
+            "sex": jsonPost.get("SEX"),  # .get() simples para campos diretos
         },
-        "weight": int(jsonPost["WEIGHT"]),
-        "height": int(jsonPost["HEIGHT"]),
-        "heartRate": jsonPost["heart_rate"],
-        "systolicPressure": jsonPost['systolic_pressure'],
-        "diastolicPressure": jsonPost['diastolic_pressure'],
-        "temperature": jsonPost['temperature'],
-        "oxygenSaturation": jsonPost['oxygen_saturation'],
-        "medications": [med.strip() for med in jsonPost["MEDICATIONS"].split(',')],
-        "allergies": [allg.strip() for allg in jsonPost["ALLERGIES"].split(',')],
-        "diseases": [dis.strip() for dis in jsonPost["DISEASES"].split(',')],
-        "interview": i_list
+        "weight": weight,
+        "height": height,
+        "heartRate": jsonPost.get("heart_rate"), # .get() simples
+        "systolicPressure": jsonPost.get('systolic_pressure'), # .get() simples
+        "diastolicPressure": jsonPost.get('diastolic_pressure'), # .get() simples
+        "temperature": jsonPost.get('temperature'), # .get() simples
+        "oxygenSaturation": jsonPost.get('oxygen_saturation'), # .get() simples
+        "medications": medications,
+        "allergies": allergies,
+        "diseases": diseases,
+        "interview": i_list  # 'i_list' já foi definido fora, então não precisa de .get()
     }
     response = requests.post(url, json=requestBody)
     print(response)
