@@ -1,3 +1,4 @@
+import time
 import asyncio
 import aiomqtt as mqtt
 import logging
@@ -20,9 +21,7 @@ class States(Enum):
     IDLE        = "idle"
     FORMS       = "forms"
     TEMPERATURE = "temperature"
-    OXYMETER    = "oxymeter"
-    PRESSURE    = "pressure"
-    INTERVIEW   = "interview"
+    MEASURES    = "measures"
     FINISHED    = "finished"
     CANCELLED   = "cancelled"
 
@@ -59,37 +58,39 @@ def handle_disconnect():
     print("client disconnected")
 
 @socketio.on("client_message")
-async def handle_receive(msg):
+def handle_receive(msg):
     global mqtt_client
     print("message received", msg)
     if mqtt_client is not None:
-        await mqtt_client.publish(UI_RECEIVE, msg)
+        a = mqtt_client.publish(UI_RECEIVE, msg)
 
-    data = json.loads(msg)
-    match data["type"]:
-        case "command":
-            match data["action"]:
-                case "start":
-                    handle_start()
-                case "cancel":
-                    handle_cancel()
-                case _:
-                    # ignore unknown action
-                    print("received invalid command")
+    # # Uncomment this for testing running this file directly 
+    # data = json.loads(msg)
+    # match data["type"]:
+    #     case "command":
+    #         match data["action"]:
+    #             case "start":
+    #                 handle_start()
+    #             case "cancel":
+    #                 handle_cancel()
+    #             case _:
+    #                 # ignore unknown action
+    #                 print("received invalid command")
+    #
+    #     case "name":
+    #         receive_name(data["value"])
+    #     case "cpf":
+    #         receive_cpf(data["value"])
+    #     case _:
+    #         # ignore unknown type
+    #         print("received invalid message")
 
-        case "name":
-            receive_name(data["value"])
-        case "cpf":
-            receive_cpf(data["value"])
-        case _:
-            # ignore unknown type
-            print("received invalid message")
-
-def send_state(state, msg):
+def send_state(state, msg, step=""):
     payload = {
         "type": "state",
         "state": state.value,
-        "msg": msg
+        "msg": msg,
+        "step": step
     }
     output_string = json.dumps(payload)
     print("sending message:", output_string)
@@ -120,7 +121,7 @@ def handle_start():
         send_state(States.IDLE, "")
 
     current_state = States.FORMS
-    send_state(current_state, "What is your name?")
+    send_state(current_state, "What is your name?", "name")
 
 def handle_cancel():
     global current_state
@@ -131,10 +132,19 @@ def handle_cancel():
 
 def receive_name(name):
     print("name:", name)
+    send_state(current_state, "What is your cpf", "cpf")
     # TODO implement
 
 def receive_cpf(cpf):
     print("name:", cpf)
+    send_state(current_state, "What is your date of birth", "age")
+    time.sleep(5)
+    send_state(States.MEASURES, "Follow the instructions on the screen", "temperature")
+    time.sleep(5)
+    send_state(States.MEASURES, "Follow the instructions on the screen", "oxymeter")
+    time.sleep(5)
+    send_state(States.MEASURES, "Follow the instructions on the screen", "pressure")
+    time.sleep(5)
     # TODO implement
 
 async def main():

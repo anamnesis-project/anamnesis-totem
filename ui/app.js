@@ -20,8 +20,8 @@ const states = Object.freeze({
 });
 
 const FormStep = Object.freeze({
-    NAME:     "temperature",
-    CPF:      "oxymeter",
+    NAME:     "name",
+    CPF:      "cpf",
     QUESTION: "question"
 });
 
@@ -189,7 +189,6 @@ async function updateState(state, step, msg) {
                     break;
                 }
             }
-            await loadView("measures");
             break;
         }
         case states.INTERVIEW: {
