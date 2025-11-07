@@ -123,7 +123,7 @@ void setup(void) {
     servo2.setPeriodHertz(100);
     servo1.attach(SERVO1_PIN);
     servo2.attach(SERVO2_PIN);
-    servo1.write(130);
+    servo1.write(120);
     servo2.write(0);
 
     // Inicializa Relé
@@ -337,7 +337,7 @@ void loop() {
             break;
 
         case SERVO2_FORWARD:
-            servo2.write(170);
+            servo2.write(160);
             delay(500);
             Serial.println("P1:OK");
             currentState = IDLE;
