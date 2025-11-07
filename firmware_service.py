@@ -13,7 +13,7 @@ FW_INPUT = "fw/input"
 FW_OUTPUT = "fw/output"
 
 try:
-    ser = serial.Serial('/dev/ttyS0', 115200, timeout=1)
+    ser = serial.Serial('/dev/ttyS0', 115200, timeout=10)
     ser.flush()
     print("Serial port connected")
 except serial.SerialException as e:
@@ -22,16 +22,45 @@ except serial.SerialException as e:
 
 async def fw_communication(command: str) -> str:
     try:
-        logging.info("Sending command to firmware...")
+        print('OXI') #DEBUG
+        if command == 'TEMPERATURE':
+            command = 'T\n'
+        elif command == 'OXYMETER':
+            command = 'O\n'
+        elif command == 'PRESSURE_OPEN_DOOR':
+            command = 'P\n'
+        elif command == 'PRESSURE_START_MONITOR':
+            command = 'P1\n'
+        elif command == 'PRESSURE_CLOSE_DOOR':
+            command = 'P2\n'
+        logging.info(f"Sending command {command} to firmware ")
+        await asyncio.to_thread(ser.reset_input_buffer)
         await asyncio.to_thread(ser.write, command.encode('ascii'))
-        
         response_bytes = await asyncio.to_thread(ser.readline)
+        """
+        if command == 'TEMPERATURE':
+            response_bytes = b'T:OK:36.4\n'#await asyncio.to_thread(ser.readline)
+        elif command == 'OXYMETER':
+            response_bytes = b'O:OK:98\n'
+        elif command == 'PRESSURE_OPEN_DOOR':
+            response_bytes = b'P0:OK:DOOR_OPENED\n'
+        elif command == 'PRESSURE_START_MONITOR':
+            response_bytes = b'P1:OK:MONITORING_STARTED\n'
+        elif command == 'PRESSURE_CLOSE_DOOR':
+            response_bytes = b'P2:OK:DOOR_CLOSED\n'
         if not response_bytes:
             logging.warning("No response from firmware")
             return False
+        """
         response = response_bytes.decode('utf-8').rstrip()
+        logging.info(f"Raw bytes received from FW: {response_bytes}") # <-- NOVO LOG
+        
+        if not response_bytes:
+            logging.warning("No response from firmware (timeout)")
+            return "FW_TIMEOUT" # Retorne um erro claro
+        
         print(f"[Pi <- FW] Response: {response}")
-        return json.loads(response)
+        return response
 
     except Exception as e:
         logging.error(f"Error communication with FW: {e}")
@@ -48,7 +77,8 @@ async def main():
                 if message.topic.matches(FW_INPUT):
                     command = message.payload.decode('utf-8')
                     logging.info(f"Received command: {command}")
-                    response = 'FAILED'#await fw_communication(command)
+                    response = await fw_communication(command)
+                    print("sending: " + response)
                     await client.publish(FW_OUTPUT, response)
                         
     except mqtt.exceptions.MqttError as e:
