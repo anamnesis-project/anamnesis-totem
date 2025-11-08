@@ -175,10 +175,6 @@ async def main():
                             Session.jsonPost = {}
                             Session.interview = []
                             await ui_cancel(client)
-                    else:
-                        Session.jsonPost[ui_message["type"]] = ui_message["value"]
-                        if ui_message["cpf"] and Session.main_state == State.FORMS:
-                            Session.main_state = State.FORMS
 
                 if Session.main_state == State.FORMS:
                     await run_forms_flow(client, message, payload, Session)
