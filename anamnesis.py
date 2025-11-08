@@ -169,11 +169,7 @@ async def main():
                             question = Forms.get_by_index(Session.forms_state).question
                             await client.publish(TOPIC_SPEAK, question)
                         if ui_message["action"] == "cancel":
-                            Session.main_state = State.IDLE
-                            Session.forms_state = 0
-                            Session.measures_state = 0
-                            Session.jsonPost = {}
-                            Session.interview = []
+                            Session = SessionState()
                             await ui_cancel(client)
 
                 if Session.main_state == State.FORMS:
