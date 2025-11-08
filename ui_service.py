@@ -158,7 +158,7 @@ def receive_name(name):
 
 def receive_cpf(cpf):
     print("cpf:", cpf) # Corrected from "name:"
-    send_state(current_state, "What is your date of birth", "age")
+    send_state(current_state, "What is your date of birth?", "age")
     # Note: time.sleep() blocks the worker thread.
     # This is fine for testing, but for production,
     # this logic should be in an async function with asyncio.sleep
