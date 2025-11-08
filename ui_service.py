@@ -167,9 +167,13 @@ async def handle_mqtt():
         logging.critical(f"ERROR: Could not connecto to MQTT at {MQTT_BROKER}:{MQTT_PORT}.")
         logging.critical(f"Detail: {e}")
 
-async def serve():
+def serve_blocking():
     print("Starting server on port 5000")
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+
+async def serve():
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, serve_blocking)
 
 async def main():
     await asyncio.gather(
