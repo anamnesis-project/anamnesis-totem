@@ -10,6 +10,11 @@
 #define RELE_PIN 14
 
 #define DEBUGMODE 1
+#define SIMULATE_SENSORS 0 // Mude para 0 para usar os sensores reais
+#define SerialPi Serial2 
+#define RX2_PIN 16
+#define TX2_PIN 17
+
 // Definição dos estados
 enum State {
     IDLE,
@@ -75,11 +80,9 @@ const uint8_t spo2_table[184] =
 int beatAvg;
 int SPO2;
 bool fingerOnSensor = false;
-// Variáveis de debug para análise
 int lastRatio = 0;
 long lastRedAC = 0;
 long lastIrAC = 0;
-
 
 // Variáveis globais de controle
 State currentState = IDLE;
@@ -93,28 +96,38 @@ int sampleCount = 0;
 uint8_t try_count = 0;
 
 void setup(void) {
+    // Serial UART0 - USB (Debug)
+    Serial.begin(115200); 
+    
+    // SerialPi UART2 - Raspberry Pi
+    SerialPi.begin(115200, SERIAL_8N1, RX2_PIN, TX2_PIN);
 
     #if DEBUGMODE
-        Serial.println("Iniciando sistema...");
+        Serial.println("Iniciando sistema... (Debug USB)");
+    #endif
+    
+    #if !SIMULATE_SENSORS
+        // Inicializa I2C com os pinos customizados para o ESP32
+        Wire.begin(I2C_SDA, I2C_SCL); // Descomente se não estiver em outro lugar
+
+        // Inicializa sensor MAX30102
+        if (!sensor.begin()) {
+            Serial.println("ERRO: Sensor MAX30102 não encontrado!");
+        }
+        sensor.setup();
+
+        // Inicializa MLX90614
+        if (!mlx.begin()) {
+            Serial.println("Erro: MLX90614 não encontrado!");
+        }
+    #else
+        #if DEBUGMODE
+            Serial.println("******************************************");
+            Serial.println("ATENCAO: SENSORES EM MODO DE SIMULACAO!");
+            Serial.println("******************************************");
+        #endif
     #endif
 
-    Serial.begin(115200);
-    
-    // Inicializa I2C com os pinos customizados para o ESP32
-    Wire.begin(I2C_SDA, I2C_SCL);
-
-    // Inicializa sensor MAX30102
-    if (!sensor.begin()) {
-        Serial.println("ERRO: Sensor MAX30102 não encontrado!");
-        //while (1);
-    }
-    sensor.setup();
-
-    // Inicializa MLX90614
-    if (!mlx.begin()) {
-        Serial.println("Erro: MLX90614 não encontrado!");
-        //while (1);
-    }
 
     // Inicializa Servos
     ESP32PWM::allocateTimer(0);
@@ -131,7 +144,7 @@ void setup(void) {
     digitalWrite(RELE_PIN, LOW);
 
     #if DEBUGMODE
-        Serial.println("Sistema Inicializado...");
+        Serial.println("Sistema Inicializado.");
     #endif
 }
 
@@ -148,9 +161,14 @@ int getMedianInt(std::vector<int>& samples) {
 }
 
 void processSerialCommands() {
-    if (Serial.available()) {
-        String command = Serial.readStringUntil('\n');
+    if (SerialPi.available()) {
+        String command = SerialPi.readStringUntil('\n');
         
+        #if DEBUGMODE
+            Serial.print("Comando recebido do Pi: ");
+            Serial.println(command);
+        #endif
+
         if (command == "T") {
             currentState = MEASURE_TEMP;
             tempSamples.clear();
@@ -177,7 +195,11 @@ void processSerialCommands() {
 void loop() {
     processSerialCommands();
     unsigned long currentTime = millis();
-    sensor.check();
+    
+    #if !SIMULATE_SENSORS
+        sensor.check();
+    #endif
+
     switch (currentState) 
     {
         case IDLE:
@@ -192,14 +214,20 @@ void loop() {
 
         case MEASURE_TEMP:
             if (currentTime - lastSampleTime >= 100) {
-                float temp = mlx.readObjectTempC();
+                
+                #if SIMULATE_SENSORS
+                    float temp = 36.5; // Valor de simulação
+                #else
+                    float temp = mlx.readObjectTempC();
+                #endif
+
                 tempSamples.push_back(temp);
                 sampleCount++;
                 lastSampleTime = currentTime;
 
                 if (sampleCount >= 5) {
                     float medianTemp = getMedian(tempSamples);
-                    Serial.printf("T:OK:%.2f\n", medianTemp);
+                    SerialPi.printf("T:OK:%.2f\n", medianTemp);
                     currentState = IDLE;
                 }
             }
@@ -216,116 +244,136 @@ void loop() {
             break;
 
         case MEASURE_OXI:
-            sensor.check();
-            if (currentTime - lastSampleTime >= 100) 
-            {
-                if (sensor.available()) 
+            
+            #if SIMULATE_SENSORS
+                if (currentTime - lastSampleTime >= 100) { 
+                    int fakeSPO2 = 98;
+                    oxiSamples.push_back(fakeSPO2);
+                    sampleCount++;
+                    lastSampleTime = currentTime;
+                    
+                    #if DEBUGMODE
+                        Serial.print("Simulando SpO2... Amostra: ");
+                        Serial.println(sampleCount);
+                    #endif
+
+                    if (sampleCount >= 5) {
+                        int medianSPO2 = getMedianInt(oxiSamples);
+                        SerialPi.printf("O:OK:%d\n", medianSPO2);
+                        currentState = SERVO1_BACKWARD; 
+                    }
+                }
+            
+            #else
+                sensor.check(); 
+                if (currentTime - lastSampleTime >= 100) 
                 {
-                    uint32_t irValue = sensor.getIR();
+                    if (sensor.available()) 
+                    {
+                        uint32_t irValue = sensor.getIR();
                     uint32_t redValue = sensor.getRed(); // Ler ambos os valores para os filtros
-                    sensor.nextSample();
+                        sensor.nextSample();
 
                     // Lógica de detecção com histerese para evitar oscilação
-                    if (irValue < FINGER_OFF_THRESHOLD && fingerOnSensor) {
-                        fingerOnSensor = false;
-                        beatAvg = 0;
-                        SPO2 = 0;
-                        #if DEBUGMODE
+                        if (irValue < FINGER_OFF_THRESHOLD && fingerOnSensor) {
+                            fingerOnSensor = false;
+                            beatAvg = 0;
+                            SPO2 = 0;
+                            #if DEBUGMODE
                             Serial.println("\nDedo removido. Aguardando...");
-                        #endif
-                    } else if (irValue > FINGER_ON_THRESHOLD && !fingerOnSensor) {
-                        fingerOnSensor = true;
-                        lastBeat = millis(); // Reseta o timer da batida quando o dedo é detectado
-                        #if DEBUGMODE
-                            Serial.println("Dedo detectado. Realizando medição...");
-                        #endif
-                    }
-                    
-                    if (fingerOnSensor) 
-                    {
-                        // Processamento do sinal para encontrar o batimento
-                        int16_t IR_signal = pulseIR.ma_filter(pulseIR.dc_filter(irValue));
-                        bool beatIR = pulseIR.isBeat(IR_signal);
-
-                        // *** CORREÇÃO PARA SpO2 ***
-                        // Processa o sinal vermelho da mesma forma, chamando isBeat() para forçar
-                        // o cálculo interno do valor AC (avgAC) na biblioteca.
-                        int16_t Red_signal = pulseRed.ma_filter(pulseRed.dc_filter(redValue));
-                        pulseRed.isBeat(Red_signal); // A chamada é necessária, mesmo sem usar o resultado.
-
-                        if (beatIR) 
+                            #endif
+                        } else if (irValue > FINGER_ON_THRESHOLD && !fingerOnSensor) {
+                            fingerOnSensor = true;
+                            lastBeat = millis(); // Reseta o timer da batida quando o dedo é detectado
+                            #if DEBUGMODE
+                                Serial.println("Dedo detectado. Realizando medição...");
+                            #endif
+                        }
+                        
+                        if (fingerOnSensor) 
                         {
-                            long beatInterval = currentTime - lastBeat;
-                            
-                            if (beatInterval > 600) 
-                            { 
-                                lastBeat = currentTime;
-                                
-                                long btpm = 60000 / beatInterval;
-                                if (btpm > 40 && btpm < 200) {
-                                    beatAvg = bpm.filter((int16_t)btpm);
-                                }
-                                
-                                // Calcula o SpO2 somente quando temos um batimento válido
-                                long numerator = (pulseRed.avgAC() * pulseIR.avgDC()) / 256;
-                                long denominator = (pulseRed.avgDC() * pulseIR.avgAC()) / 256;
-                                int RX100 = (denominator > 0) ? (numerator * 100) / denominator : 999;
+                            // Processamento do sinal para encontrar o batimento
+                            int16_t IR_signal = pulseIR.ma_filter(pulseIR.dc_filter(irValue));
+                            bool beatIR = pulseIR.isBeat(IR_signal);
 
-                                if ((RX100 >= 0) && (RX100 < 184)) 
-                                {
-                                    SPO2 = spo2_table[RX100];
-                                    oxiSamples.push_back(SPO2);
-                                    sampleCount++;
+                            // *** CORREÇÃO PARA SpO2 ***
+                            // Processa o sinal vermelho da mesma forma, chamando isBeat() para forçar
+                            // o cálculo interno do valor AC (avgAC) na biblioteca.
+                            int16_t Red_signal = pulseRed.ma_filter(pulseRed.dc_filter(redValue));
+                            pulseRed.isBeat(Red_signal); // A chamada é necessária, mesmo sem usar o resultado.
+
+                            if (beatIR) 
+                            {
+                                long beatInterval = currentTime - lastBeat;
+                                
+                                if (beatInterval > 600) 
+                                { 
+                                    lastBeat = currentTime;
+                                    
+                                    long btpm = 60000 / beatInterval;
+                                    if (btpm > 40 && btpm < 200) {
+                                        beatAvg = bpm.filter((int16_t)btpm);
+                                    }
+                                    
+                                    // Calcula o SpO2 somente quando temos um batimento válido
+                                    long numerator = (pulseRed.avgAC() * pulseIR.avgDC()) / 256;
+                                    long denominator = (pulseRed.avgDC() * pulseIR.avgAC()) / 256;
+                                    int RX100 = (denominator > 0) ? (numerator * 100) / denominator : 999;
+
+                                    if ((RX100 >= 0) && (RX100 < 184)) 
+                                    {
+                                        SPO2 = spo2_table[RX100];
+                                        oxiSamples.push_back(SPO2);
+                                        sampleCount++;
+                                    }
                                 }
                             }
-                        }
 
                         // Imprime os valores no Monitor Serial a cada 1 segundo para não poluir o terminal
                         lastPrintTime = currentTime;
-                        #if DEBUGMODE
-                            if (beatAvg > 0 && SPO2 > 0) 
-                            {
-                                Serial.print("BPM: ");
-                                Serial.print(beatAvg);
-                                Serial.print(" | SpO2: ");
-                                Serial.print(SPO2);
-                                Serial.println("%");
-                            }
-            
-                            if (sampleCount >= 5) 
-                            {
-                                int medianSPO2 = getMedianInt(oxiSamples);
-                                Serial.printf("O:OK:%d\n", medianSPO2);
-                                currentState = SERVO1_BACKWARD;
-                            }
-            
-                            if (currentTime - lastPrintTime > 1000) 
-                            {
-                                lastPrintTime = currentTime;
-                                #if DEBUGMODE
+                            #if DEBUGMODE
+                                if (beatAvg > 0 && SPO2 > 0) 
+                                {
+                                    Serial.print("BPM: ");
+                                        Serial.print(beatAvg);
+                                        Serial.print(" | SpO2: ");
+                                        Serial.print(SPO2);
+                                        Serial.println("%");
+                                    }
+                    
+                                if (sampleCount >= 5) 
+                                {
+                                    int medianSPO2 = getMedianInt(oxiSamples);
+                                    // --- MODIFICADO ---
+                                    SerialPi.printf("O:OK:%d\n", medianSPO2); // Resposta para o Pi
+                                    currentState = SERVO1_BACKWARD;
+                                }
+                
+                                if (currentTime - lastPrintTime > 1000) 
+                                {
+                                    lastPrintTime = currentTime;
                                     Serial.print("Measuring SpO2... Samples: ");
                                     Serial.println(sampleCount);
-                                #endif
-                            }
-                        #endif
-                        lastSampleTime = currentTime;
-                    }
-            
-                }
-                else
-                {
-                    sensor.check();
-                    #if DEBUGMODE
-                        if(try_count > 5)
-                        {   
-                            try_count = 0;
-                            Serial.println("WAIT....");
+                                }
+                            #endif
+                            lastSampleTime = currentTime;
                         }
-                        else
-                            try_count++;
-                    #endif
+                    }
+                    else
+                    {
+                        sensor.check();
+                        #if DEBUGMODE
+                            if(try_count > 5)
+                            {   
+                                try_count = 0;
+                                Serial.println("WAIT....");
+                            }
+                            else
+                                try_count++;
+                        #endif
+                    }
                 }
-            }
+            #endif
             break;
 
         case SERVO1_BACKWARD:
@@ -339,14 +387,14 @@ void loop() {
         case SERVO2_FORWARD:
             servo2.write(160);
             delay(500);
-            Serial.println("P1:OK");
+            SerialPi.println("P1:OK");
             currentState = IDLE;
             break;
 
         case SERVO2_BACKWARD:
             servo2.write(0);
             delay(500);
-            Serial.println("P2:OK");
+            SerialPi.println("P2:OK");
             currentState = IDLE;
             break;
 
@@ -354,10 +402,9 @@ void loop() {
             if (currentTime - releStartTime >= 400) 
             {
                 digitalWrite(RELE_PIN, LOW);
-                Serial.println("P:OK");
+                SerialPi.println("P:OK");
                 currentState = IDLE;
             }
             break;
     }
 }
-
