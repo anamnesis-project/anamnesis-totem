@@ -76,7 +76,7 @@ class Forms(Enum):
                 return member
 
 class Measures(Enum):
-    TEMPERATURE = (0, "temperature", "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen.")
+    TEMPERATURE = (0, "temperature", "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen. Tell me when you are ready")
     OXYMETER = (1, "oxymeter", "Please, put your finger on the oxymeter as shown on the screen.")
     PRESSURE_OPEN_DOOR = (2, "pressure", "Please, grab the cuff inside the totem and place it on your bare arm, and tell me when you are Im ready...")
     PRESSURE_START_MONITOR = (3, "pressure", "Please put the cuff back in the cabinet and tell me when it is done")
@@ -244,7 +244,7 @@ async def run_forms_flow(client, message, payload, Session):
             await ui_send_state(client, "measures", speach, step)
             await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
             #await client.publish(TOTEM SCREEN)
-            await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
+            #await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
         else:
             question = Forms.get_by_index(Session.forms_state).question
             step = Forms.get_by_index(Session.forms_state).step
@@ -355,7 +355,8 @@ async def run_measures_flow(client, message, payload, Session):
         if payload != SPEAK_SUCCESS_PAYLOAD:
             log.warning(f"Audio_player_service falhou: '{payload}'")
             return False #???
-        if Session.measures_state in [Measures.PRESSURE_OPEN_DOOR.index, 
+        if Session.measures_state in [Measures.TEMPERATURE.index,
+                                      Measures.PRESSURE_OPEN_DOOR.index, 
                                       Measures.PRESSURE_START_MONITOR.index]: 
             await client.publish(MIC_START, MIC_START_PAYLOAD)
     
