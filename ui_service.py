@@ -147,7 +147,7 @@ def receive_cpf(cpf):
     time.sleep(5)
     # TODO implement
 
-async def main():
+async def handle_mqtt():
     try:
         async with mqtt.Client(MQTT_BROKER, port=MQTT_PORT) as client:
             logging.info(f"Conected to MQTT Broker: {MQTT_BROKER}.")
@@ -167,8 +167,15 @@ async def main():
         logging.critical(f"ERROR: Could not connecto to MQTT at {MQTT_BROKER}:{MQTT_PORT}.")
         logging.critical(f"Detail: {e}")
 
+async def serve():
     print("Starting server on port 5000")
     socketio.run(app, host='0.0.0.0', port=5000)
+
+async def main():
+    await asyncio.gather(
+        handle_mqtt(),
+        serve(),
+    )
 
 if __name__ == '__main__':
     asyncio.run(main())

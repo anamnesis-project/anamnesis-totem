@@ -152,8 +152,6 @@ async def main():
             await client.subscribe(UI_RECEIVE)
             await client.subscribe(CAM_OUTPUT)
             log.info(f"Connected to Broker {MQTT_BROKER}.")
-            question = Forms.get_by_index(Session.forms_state).question
-            await client.publish(TOPIC_SPEAK, question)
             async for message in client.messages:
                 try:
                     payload = message.payload.decode('utf-8')
