@@ -166,6 +166,8 @@ async def main():
                         if ui_message["action"] == "start" and Session.main_state == State.IDLE:
                             Session.main_state = State.FORMS
                             await ui_start(client)
+                            question = Forms.get_by_index(Session.forms_state).question
+                            await client.publish(TOPIC_SPEAK, question)
                         if ui_message["action"] == "cancel":
                             Session.main_state = State.IDLE
                             Session.forms_state = 0
@@ -179,10 +181,10 @@ async def main():
                             Session.main_state = State.FORMS
 
                 if Session.main_state == State.FORMS:
-                    await run_forms_flow(client, message, payload)
+                    await run_forms_flow(client, message, payload, Session)
                     
                 elif Session.main_state == State.MEASURES:
-                    await run_measures_flow(client, message, payload)
+                    await run_measures_flow(client, message, payload, Session)
                     if Session.main_state == State.INTERVIEW:
                         Session.interview.append(FIRST_QUESTION)
                         Session.dinamic_context += "\n[You]: " + FIRST_QUESTION
@@ -228,13 +230,15 @@ async def run_forms_flow(client, message, payload, Session):
         if Session.forms_state >= len(Forms): #DISEASES
             Session.main_state = State.MEASURES
             print('Changing to MEASURES')
+            speach = Measures.get_by_index(Session.measures_state).speach
+            step =  Measures.get_by_index(Session.measures_state).step
             await ui_send_state(client, "measures", speach, step)
             await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
             #await client.publish(TOTEM SCREEN)
             await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
         else:
             question = Forms.get_by_index(Session.forms_state).question
-            step = Forms.get_by_index(formst_state).step
+            step = Forms.get_by_index(Session.forms_state).step
             await ui_send_state(client, "forms", question, step)
             await client.publish(TOPIC_SPEAK, question)
 
@@ -413,7 +417,7 @@ def build_llm_prompt(message, Session):
         Session.dinamic_context += "\n[Patient]: " + message
         return Session.dinamic_context
 
-def insert_cli(jsonPost, interview):
+def insert_cli(jsonPost, interview, Session):
     url = 'https://kickless-untaxing-neil.ngrok-free.dev/reports'
     i_list = []
     for i in range(0, len(interview), 2):

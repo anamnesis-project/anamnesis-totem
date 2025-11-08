@@ -16,6 +16,7 @@ UI_SEND = "ui/send"
 UI_RECEIVE = "ui/receive"
 
 mqtt_client = None
+main_loop = None # To store the main asyncio event loop
 
 class States(Enum):
     IDLE        = "idle"
@@ -57,14 +58,19 @@ def handle_connect():
 def handle_disconnect():
     print("client disconnected")
 
-@socketio.on("client_message")
-def handle_receive(msg):
+async def _async_handle_receive(msg):
+    """This is the asynchronous logic that will run on the main loop."""
     global mqtt_client
-    print("message received", msg)
+    print("message received (async handler)", msg)
     if mqtt_client is not None:
-        a = mqtt_client.publish(UI_RECEIVE, msg)
+        try:
+            await mqtt_client.publish(UI_RECEIVE, msg)
+        except Exception as e:
+            logging.error(f"Error publishing to MQTT: {e}")
 
     # # Uncomment this for testing running this file directly 
+    # # Note: This part is synchronous, but it's okay inside the async function
+    # # for testing. For real use, consider 'await asyncio.sleep' instead of 'time.sleep'
     # data = json.loads(msg)
     # match data["type"]:
     #     case "command":
@@ -85,6 +91,20 @@ def handle_receive(msg):
     #         # ignore unknown type
     #         print("received invalid message")
 
+@socketio.on("client_message")
+def handle_receive(msg):
+    """
+    This is the synchronous SocketIO handler.
+    It schedules the async logic to run on the main asyncio loop.
+    """
+    global main_loop
+    if main_loop:
+        # Safely schedule the coroutine to run on the main event loop from this thread
+        asyncio.run_coroutine_threadsafe(_async_handle_receive(msg), main_loop)
+    else:
+        logging.error("Main asyncio loop is not available.")
+
+
 def send_state(state, msg, step=""):
     payload = {
         "type": "state",
@@ -94,6 +114,7 @@ def send_state(state, msg, step=""):
     }
     output_string = json.dumps(payload)
     print("sending message:", output_string)
+    # socketio.emit is thread-safe
     socketio.emit("server_message", output_string)
 
 def send_data(field, value):
@@ -136,9 +157,13 @@ def receive_name(name):
     # TODO implement
 
 def receive_cpf(cpf):
-    print("name:", cpf)
+    print("cpf:", cpf) # Corrected from "name:"
     send_state(current_state, "What is your date of birth", "age")
-    time.sleep(5)
+    # Note: time.sleep() blocks the worker thread.
+    # This is fine for testing, but for production,
+    # this logic should be in an async function with asyncio.sleep
+    # or handled by the external MQTT logic.
+    time.sleep(5) 
     send_state(States.MEASURES, "Follow the instructions on the screen", "temperature")
     time.sleep(5)
     send_state(States.MEASURES, "Follow the instructions on the screen", "oxymeter")
@@ -150,7 +175,7 @@ def receive_cpf(cpf):
 async def handle_mqtt():
     try:
         async with mqtt.Client(MQTT_BROKER, port=MQTT_PORT) as client:
-            logging.info(f"Conected to MQTT Broker: {MQTT_BROKER}.")
+            logging.info(f"Connected to MQTT Broker: {MQTT_BROKER}.")
             await client.subscribe(UI_SEND)
 
             global mqtt_client
@@ -159,19 +184,30 @@ async def handle_mqtt():
             logging.info("waiting for message...")
             async for message in client.messages:
                 if message.topic.matches(UI_SEND):
-                    socketio.emit("server_message", message.payload)
-                elif message.topic.matches(UI_RECEIVE):
-                    await client.publish(UI_RECEIVE)
+                    # Forward message from MQTT to SocketIO client
+                    socketio.emit("server_message", message.payload.decode()) # Decode payload
+                # Removed the UI_RECEIVE match, as publishing is handled by _async_handle_receive
+                # elif message.topic.matches(UI_RECEIVE):
+                #     await client.publish(UI_RECEIVE)
 
     except mqtt.exceptions.MqttError as e:
-        logging.critical(f"ERROR: Could not connecto to MQTT at {MQTT_BROKER}:{MQTT_PORT}.")
+        logging.critical(f"ERROR: Could not connect to MQTT at {MQTT_BROKER}:{MQTT_PORT}.")
         logging.critical(f"Detail: {e}")
+    except Exception as e:
+        logging.error(f"An error occurred in handle_mqtt: {e}")
+        # Optionally, add a retry mechanism
+        await asyncio.sleep(5)
+        asyncio.create_task(handle_mqtt()) # Relaunch task
 
 def serve_blocking():
     print("Starting server on port 5000")
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+    socketio.run(app, host="0.0.0.0", port=5000, debug=False, allow_unsafe_werkzeug=True)
 
 async def serve():
+    global main_loop
+    # Get the running event loop in the main thread
+    main_loop = asyncio.get_running_loop() 
+    
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, serve_blocking)
 
@@ -182,5 +218,7 @@ async def main():
     )
 
 if __name__ == '__main__':
-    asyncio.run(main())
-
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logging.info("Shutting down...")
