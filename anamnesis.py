@@ -196,7 +196,20 @@ async def main():
         log.info("Service ended by user")
 
 async def run_forms_flow(client, message, payload, Session):
-    if message.topic.matches(SPEAK_RESPONSE):
+    if message.topic.matches(UI_RECEIVE):
+        ui_message = json.loads(payload)
+        if ui_message.get("type") == "command":
+            return
+
+        Session.jsonPost["patient"][ui_message["type"]] = ui_message["value"]
+        Session.forms_state += 1
+        print('form state:', Session.forms_state)
+        question = Forms.get_by_index(Session.forms_state).question
+        step = Forms.get_by_index(Session.forms_state).step
+        await ui_send_state(client, "forms", question, step)
+        await client.publish(TOPIC_SPEAK, question)
+
+    elif message.topic.matches(SPEAK_RESPONSE):
         if payload != SPEAK_SUCCESS_PAYLOAD:
             log.warning(f"Audio_player_service failed: '{payload}'")
             return False #???
