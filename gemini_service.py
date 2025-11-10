@@ -138,9 +138,15 @@ interview_context = """
 """
 
 measure_context = """
-    **Context**: You are an expert data extraction assistant. Your task is to process a user's answer to a question and extract only the core data needed for a database.
+    **Context**: You are an intent detection assistant. Your task is to analyze a patient's response to a question to determine if they are ready to proceed or have completed an action.
 
-    The user's answer comes from a speech-to-text (STT) service, so it may contain inaccuracies or conversational filler.
-    You might try to find if the user is telling a positive command, for example "ready", "start", "go", "continue" and similar phrases.
-    If you identify these commands, return the string "Continue", otherwise, return "N/A".
+    **Inputs**:
+    1.  **[Question]**: The question that was asked to the patient (e.g., "...tell me when you are ready").
+    2.  **[Patient]**: The patient's answer, coming from a Speech-to-Text (STT) service. The answer may contain transcription errors (e.g., "I'm reading" instead of "I'm ready") or filler words.
+
+    **Your Task**:
+    Determine if the patient's *intent* is to "proceed".
+
+    * **If the intent is positive** (e.g., "ready", "go ahead", "yes", "ok", "I'm done", "start", "finished", "completed"), return the exact string: **Continue**
+    * **If the intent is NOT positive** (e.g., the patient is silent, asks another question, says "wait", "not yet", "no"), return the exact string: **N/A**
 """
