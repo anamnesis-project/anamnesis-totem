@@ -1,6 +1,6 @@
 import cv2
 
-img = cv2.imread("2025-11-06-165701.jpg")
+img = cv2.imread("2025-11-07-232210.jpg")
 height, width = img.shape[:2]
 center = (width/2, height/2)
 
@@ -10,7 +10,7 @@ img = cv2.warpAffine(img, rotation_matrix, (width, height))
 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 cv2.imwrite("saida_gray.png", img)
 img_color = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-blur = cv2.GaussianBlur(img, (7, 7), 0)
+blur = cv2.GaussianBlur(img, (5, 5), 0)
 img = cv2.adaptiveThreshold(
     blur, 255,
     cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -76,9 +76,9 @@ def ler_digito(dig_img, debug_img, x0, y0):
 
 # --- Coordenadas fixas dos dígitos (x, y, w, h) ---
 digitos_coord = {
-    "sistolica": [(218, 180, 33, 60), (262, 180, 33, 60), (304, 180, 33, 60)],
-    "diastolica": [(264, 246, 33, 60), (305, 246, 33, 60)],
-    "pulso": [(286, 320, 22, 45), (316, 320, 22, 45)]
+    "sistolica": [(218, 183, 30, 60), (262, 183, 30, 60), (305, 182, 30, 60)],
+    "diastolica": [(264, 250, 30, 60), (304, 250, 30, 60)],
+    "pulso": [(284, 325, 22, 45), (314, 325, 22, 45)]
 }
 
 # --- Processar cada grupo ---
@@ -88,7 +88,7 @@ for label, coords in digitos_coord.items():
     for (x, y, w, h) in coords:
         dig_img = img[y:y+h, x:x+w]
         numero += ler_digito(dig_img, img_color, x, y)
-        cv2.rectangle(img, (x, y), (x+w, y+h), (255, 255, 0), 1)  # amarelo = caixa do dígito
+        cv2.rectangle(img, (x, y), (x+w, y+h), (255, 255, 0), 2)  # amarelo = caixa do dígito
     valores[label] = numero
 
 print("\nLeitura automática:")
