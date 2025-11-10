@@ -56,6 +56,9 @@ public:
 #define FINGER_ON_THRESHOLD  75000 // Valor para TER CERTEZA que o dedo está no sensor
 #define FINGER_OFF_THRESHOLD 50000 // Valor para TER CERTEZA que o dedo foi removido
 
+// Timeout para o dedo ser inserido no sensor durante a medição de oxigenação (ms)
+#define OXI_FINGER_TIMEOUT 5000 // 5 segundos
+
 // --- Objetos das suas bibliotecas customizadas ---
 MAX30102 sensor;
 Pulse pulseIR;
@@ -92,6 +95,7 @@ unsigned long lastSampleTime = 0;
 unsigned long releStartTime = 0;
 unsigned long lastBeat = 0;
 unsigned long lastPrintTime = 0;
+unsigned long oxiStartTime = 0; // armazena quando entramos em MEASURE_OXI
 int sampleCount = 0;
 uint8_t try_count = 0;
 
@@ -241,6 +245,7 @@ void loop() {
             oxiSamples.clear();
             sampleCount = 0;
             lastSampleTime = currentTime;
+            oxiStartTime = currentTime; // inicia timeout para o dedo ser inserido
             break;
 
         case MEASURE_OXI:
@@ -266,15 +271,26 @@ void loop() {
             
             #else
                 sensor.check(); 
-                if (currentTime - lastSampleTime >= 100) 
+                // Se ainda não detectamos o dedo, verificamos timeout
+                if (!fingerOnSensor && oxiStartTime > 0 && (currentTime - oxiStartTime >= OXI_FINGER_TIMEOUT))
+                {
+                    #if DEBUGMODE
+                        Serial.println("Timeout: dedo nao inserido. Cancelando medicao de Oxi.");
+                    #endif
+                    currentState = SERVO1_BACKWARD;
+                    oxiStartTime = 0;
+                    break;
+                }
+
+                if (currentTime - lastSampleTime >= 20) 
                 {
                     if (sensor.available()) 
                     {
                         uint32_t irValue = sensor.getIR();
-                    uint32_t redValue = sensor.getRed(); // Ler ambos os valores para os filtros
+                        uint32_t redValue = sensor.getRed(); // Ler ambos os valores para os filtros
                         sensor.nextSample();
 
-                    // Lógica de detecção com histerese para evitar oscilação
+                        // Lógica de detecção com histerese para evitar oscilação
                         if (irValue < FINGER_OFF_THRESHOLD && fingerOnSensor) {
                             fingerOnSensor = false;
                             beatAvg = 0;
@@ -347,6 +363,7 @@ void loop() {
                                     // --- MODIFICADO ---
                                     SerialPi.printf("O:OK:%d\n", medianSPO2); // Resposta para o Pi
                                     currentState = SERVO1_BACKWARD;
+                                    oxiStartTime = 0; // sucesso, limpa timeout
                                 }
                 
                                 if (currentTime - lastPrintTime > 1000) 
@@ -363,13 +380,18 @@ void loop() {
                     {
                         sensor.check();
                         #if DEBUGMODE
-                            if(try_count > 5)
+                            if(try_count > 20)
                             {   
+                                SerialPi.printf("O:NACK:%d\n");
                                 try_count = 0;
-                                Serial.println("WAIT....");
+                                currentState = SERVO1_BACKWARD;
+                                oxiStartTime = 0; // garante reset do timeout ao sair
                             }
                             else
+                            {
+                                Serial.println("WAIT....");
                                 try_count++;
+                            }
                         #endif
                     }
                 }
