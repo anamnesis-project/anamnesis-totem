@@ -173,6 +173,7 @@ def sync_image_processing() -> dict:
 # ===================================================================
 
 async def image_recognition() -> str:
+    time.sleep(10)
     """
     Wrapper assíncrono para executar o processamento de imagem e formatar
     o resultado como uma string 'CAM:OK:...' ou 'CAM:ERR:...'.
