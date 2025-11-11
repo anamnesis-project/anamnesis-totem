@@ -343,7 +343,6 @@ async def run_measures_flow(client, message, payload, Session):
 
     elif message.topic.matches(LLM_RESPONSE):
         if payload == LLM_CONTINUE_PAYLOAD:
-            Session.measures_state += 1
             await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
         else:
             log.warning(f"Unexpected start pressure monitor payload: '{payload}'")
