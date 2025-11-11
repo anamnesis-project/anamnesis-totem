@@ -473,7 +473,7 @@ async def ui_start(client):
     await ui_send_state(client, "forms", "What is your name?", "name")
 
 async def ui_cancel(client):
-    await client.publish()
+    await ui_send_state(client, "IDLE", "")
 
 async def ui_send_state(client, state, msg, step=""):
     payload = {
