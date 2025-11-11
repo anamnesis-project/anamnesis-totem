@@ -387,7 +387,7 @@ async def run_interview_flow(client, message, payload, Session):
         Session.interview.append(payload)
         if len(Session.interview)/2 >= 1:
             a=1 #STOP
-            insert_cli(Session.jsonPost, Session.interview)
+            insert_cli(Session.jsonPost, Session.interview, Session)
         prompt = build_llm_prompt(payload, Session)
         await client.publish(TOPIC_PROMPT, prompt)
         return True #???
