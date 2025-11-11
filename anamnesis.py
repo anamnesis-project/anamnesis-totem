@@ -300,27 +300,28 @@ async def run_measures_flow(client, message, payload, Session):
                 log.warning(f"Unexpected oxymeter payload: '{payload}'")
 
         elif Session.measures_state == Measures.PRESSURE_OPEN_DOOR.index: 
-            if payload.startswith("P:OK"): #SUCCESS OPEN DOOR
+            if payload.startswith("P1:OK"): #SUCCESS OPEN DOOR
                 print('abriu')
                 #await client.publish(SCREEN SHOW RESULT)
                 speach = Measures.get_by_index(Session.measures_state).speach
                 step = Measures.get_by_index(Session.measures_state).step
                 await ui_send_state(client, "measures", speach, step)
                 await client.publish(TOPIC_SPEAK, speach)
+                Session.measures_state += 1
                 #VOICE COMMAND TO START MONITORING
                 print('COMANDO PARA INICIAR MONITORAMENTO DE PRESSAO')
 
-            elif payload.startswith("P:ERR"):
+            elif payload.startswith("P1:ERR"):
                 log.warning("Open pressure monitor door error.")
             else:
                 log.warning(f"Unexpected open pressure monitor door payload: '{payload}'")
 
         elif Session.measures_state == Measures.PRESSURE_START_MONITOR.index:
-            if payload.startswith("P1:OK"):
+            if payload.startswith("P:OK"):
                 print('CAIU CAM')
                 #await client.publish(SCREEN SHOW RESULT)
                 await client.publish(TOPIC_CAM, 'START READING')
-            elif payload.startswith("P1:ERR"):
+            elif payload.startswith("P:ERR"):
                 log.warning("Start pressure monitor error.")
             else:
                 log.warning(f"Unexpected start pressure monitor payload: '{payload}'")

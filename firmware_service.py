@@ -28,9 +28,9 @@ async def fw_communication(command: str) -> str:
         elif command == 'OXYMETER':
             command = 'O\n'
         elif command == 'PRESSURE_OPEN_DOOR':
-            command = 'P\n'
-        elif command == 'PRESSURE_START_MONITOR':
             command = 'P1\n'
+        elif command == 'PRESSURE_START_MONITOR':
+            command = 'P\n'
         elif command == 'PRESSURE_CLOSE_DOOR':
             command = 'P2\n'
         logging.info(f"Sending command {command} to firmware ")
