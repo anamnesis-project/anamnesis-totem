@@ -228,6 +228,7 @@ void loop() {
                 if (sampleCount >= 5) {
                     float medianTemp = getMedian(tempSamples);
                     SerialPi.printf("T:OK:%.2f\n", medianTemp);
+                    Serial.printf("T:OK:%.2f\n", medianTemp);
                     currentState = IDLE;
                 }
             }
@@ -383,11 +384,11 @@ void loop() {
                     {
                         sensor.check();
                         
-                            if(try_count > 200)
+                            if(try_count > 400)
                             {   
-                                SerialPi.printf("O:NACK:%d\n");
+                                SerialPi.printf("O:NACK\n");
                                 #if DEBUGMODE
-                                    Serial.printf("O:NACK:%d\n");
+                                    Serial.printf("O:NACK\n");
                                 #endif
                                 try_count = 0;
                                 currentState = SERVO1_BACKWARD;
