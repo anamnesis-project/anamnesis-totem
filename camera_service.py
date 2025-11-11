@@ -41,9 +41,9 @@ DIGITOS = {
 
 # Coordenadas fixas dos dígitos (x, y, w, h)
 digitos_coord = {
-    "sistolica": [(215, 180, 30, 60), (256, 180, 30, 60), (300, 180, 30, 60)],
-    "diastolica": [(256, 248, 30, 60), (300, 248, 30, 60)],
-    "pulso": [(276, 322, 22, 45), (304, 322, 22, 45)]
+    "sistolica": [(217, 180, 30, 60), (258, 180, 30, 60), (302, 180, 30, 60)],
+    "diastolica": [(258, 248, 30, 60), (302, 248, 30, 60)],
+    "pulso": [(278, 322, 22, 45), (306, 322, 22, 45)]
 }
 
 def ler_digito(dig_img, debug_img, x0, y0):
@@ -179,7 +179,11 @@ async def image_recognition() -> str:
     """
     try:
         logging.info("Iniciando reconhecimento de imagem em thread...")
-        valores = await asyncio.to_thread(sync_image_processing)
+        valores = sync_image_processing()
+        estado = valores.get("sistolica")[1]
+        while estado == "P":
+            valores = sync_image_processing()
+            estado = valores.get("sistolica")[1]
 
         # 1. Verificar se o processamento da imagem em si falhou
         if "error" in valores:
@@ -201,6 +205,7 @@ async def image_recognition() -> str:
 
         # 4. Formatar a string de sucesso
         response_str = f"CAM:OK:{sistolica}:{diastolica}:{pulso}"
+        print(response_str)
         return response_str
 
     except Exception as e:
