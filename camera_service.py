@@ -41,9 +41,9 @@ DIGITOS = {
 
 # Coordenadas fixas dos dígitos (x, y, w, h)
 digitos_coord = {
-    "sistolica": [(217, 180, 30, 60), (258, 180, 30, 60), (302, 180, 30, 60)],
-    "diastolica": [(258, 248, 30, 60), (302, 248, 30, 60)],
-    "pulso": [(278, 322, 22, 45), (306, 322, 22, 45)]
+    "sistolica": [(219, 180, 30, 60), (260, 180, 30, 60), (304, 180, 30, 60)],
+    "diastolica": [(260, 248, 30, 60), (304, 248, 30, 60)],
+    "pulso": [(280, 322, 22, 45), (308, 322, 22, 45)]
 }
 
 def ler_digito(dig_img, debug_img, x0, y0):
@@ -181,7 +181,7 @@ async def image_recognition() -> str:
         logging.info("Iniciando reconhecimento de imagem em thread...")
         valores = sync_image_processing()
         estado = valores.get("sistolica")[1]
-        while estado == "P":
+        while estado == "P" or estado == "?":
             valores = sync_image_processing()
             estado = valores.get("sistolica")[1]
 
