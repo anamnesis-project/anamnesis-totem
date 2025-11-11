@@ -199,10 +199,6 @@ void processSerialCommands() {
 void loop() {
     processSerialCommands();
     unsigned long currentTime = millis();
-    
-    #if !SIMULATE_SENSORS
-        sensor.check();
-    #endif
 
     switch (currentState) 
     {
@@ -246,6 +242,12 @@ void loop() {
             sampleCount = 0;
             lastSampleTime = currentTime;
             oxiStartTime = currentTime; // inicia timeout para o dedo ser inserido
+            fingerOnSensor = false;
+            
+            // Reseta o buffer do sensor para limpá-lo de dados antigos
+            #if !SIMULATE_SENSORS
+                sensor.setup(); // Reinicializa o sensor, limpando o FIFO
+            #endif
             break;
 
         case MEASURE_OXI:
@@ -282,7 +284,7 @@ void loop() {
                     break;
                 }
 
-                if (currentTime - lastSampleTime >= 20) 
+                if (currentTime - lastSampleTime >= 100) 
                 {
                     if (sensor.available()) 
                     {
@@ -345,8 +347,8 @@ void loop() {
                                 }
                             }
 
-                        // Imprime os valores no Monitor Serial a cada 1 segundo para não poluir o terminal
-                        lastPrintTime = currentTime;
+                            // Imprime os valores no Monitor Serial a cada 1 segundo para não poluir o terminal
+                            lastPrintTime = currentTime;
                             #if DEBUGMODE
                                 if (beatAvg > 0 && SPO2 > 0) 
                                 {
@@ -360,8 +362,9 @@ void loop() {
                                 if (sampleCount >= 5) 
                                 {
                                     int medianSPO2 = getMedianInt(oxiSamples);
-                                    // --- MODIFICADO ---
                                     SerialPi.printf("O:OK:%d\n", medianSPO2); // Resposta para o Pi
+                                    
+                                    Serial.printf("O:OK:%d\n", medianSPO2);
                                     currentState = SERVO1_BACKWARD;
                                     oxiStartTime = 0; // sucesso, limpa timeout
                                 }
@@ -379,20 +382,26 @@ void loop() {
                     else
                     {
                         sensor.check();
-                        #if DEBUGMODE
-                            if(try_count > 20)
+                        
+                            if(try_count > 200)
                             {   
                                 SerialPi.printf("O:NACK:%d\n");
+                                #if DEBUGMODE
+                                    Serial.printf("O:NACK:%d\n");
+                                #endif
                                 try_count = 0;
                                 currentState = SERVO1_BACKWARD;
                                 oxiStartTime = 0; // garante reset do timeout ao sair
                             }
                             else
-                            {
-                                Serial.println("WAIT....");
-                                try_count++;
+                            {   
+                                #if DEBUGMODE
+                                    if(try_count % 10 == 0)
+                                        Serial.println("WAIT ...");
+                                #endif
+                                try_count ++;
                             }
-                        #endif
+                        
                     }
                 }
             #endif
@@ -400,8 +409,8 @@ void loop() {
 
         case SERVO1_BACKWARD:
             Serial.println("Retire o o dedo do sensor.");
-            delay(800);
-            servo1.write(130);
+            delay(1600);
+            servo1.write(120);
             delay(500);
             currentState = IDLE;
             break;

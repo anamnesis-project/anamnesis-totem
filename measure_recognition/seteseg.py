@@ -1,11 +1,11 @@
 import cv2
 
-img = cv2.imread("2025-11-07-232210.jpg")
+img = cv2.imread("2025-11-10-182537.jpg")
 height, width = img.shape[:2]
 center = (width/2, height/2)
 
 # Criar matriz de rotação
-rotation_matrix = cv2.getRotationMatrix2D(center, 3, 1.0)  
+rotation_matrix = cv2.getRotationMatrix2D(center, 1, 1.0)  
 img = cv2.warpAffine(img, rotation_matrix, (width, height))
 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 cv2.imwrite("saida_gray.png", img)
@@ -38,6 +38,8 @@ DIGITOS = {
     (1,0,0,1,1,1,1): 'E',
     (1,0,0,0,1,1,1): 'F',
     (1,1,0,0,1,1,1): 'P',
+    (0,0,0,0,1,0,1): 'r',
+
 }
 
 def ler_digito(dig_img, debug_img, x0, y0):
@@ -76,9 +78,9 @@ def ler_digito(dig_img, debug_img, x0, y0):
 
 # --- Coordenadas fixas dos dígitos (x, y, w, h) ---
 digitos_coord = {
-    "sistolica": [(218, 183, 30, 60), (262, 183, 30, 60), (305, 182, 30, 60)],
-    "diastolica": [(264, 250, 30, 60), (304, 250, 30, 60)],
-    "pulso": [(284, 325, 22, 45), (314, 325, 22, 45)]
+    "sistolica": [(215, 180, 30, 60), (256, 180, 30, 60), (300, 180, 30, 60)],
+    "diastolica": [(256, 248, 30, 60), (300, 248, 30, 60)],
+    "pulso": [(276, 322, 22, 45), (304, 322, 22, 45)]
 }
 
 # --- Processar cada grupo ---
@@ -88,7 +90,7 @@ for label, coords in digitos_coord.items():
     for (x, y, w, h) in coords:
         dig_img = img[y:y+h, x:x+w]
         numero += ler_digito(dig_img, img_color, x, y)
-        cv2.rectangle(img, (x, y), (x+w, y+h), (255, 255, 0), 2)  # amarelo = caixa do dígito
+        cv2.rectangle(img, (x, y), (x+w, y+h), (255, 255, 0), 1)  # amarelo = caixa do dígito
     valores[label] = numero
 
 print("\nLeitura automática:")
