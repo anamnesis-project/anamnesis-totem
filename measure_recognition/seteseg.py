@@ -1,6 +1,6 @@
 import cv2
 
-img = cv2.imread("2025-11-10-182537.jpg")
+img = cv2.imread("2025-11-11-185902.jpg")
 height, width = img.shape[:2]
 center = (width/2, height/2)
 
@@ -78,9 +78,9 @@ def ler_digito(dig_img, debug_img, x0, y0):
 
 # --- Coordenadas fixas dos dígitos (x, y, w, h) ---
 digitos_coord = {
-    "sistolica": [(215, 180, 30, 60), (256, 180, 30, 60), (300, 180, 30, 60)],
-    "diastolica": [(256, 248, 30, 60), (300, 248, 30, 60)],
-    "pulso": [(276, 322, 22, 45), (304, 322, 22, 45)]
+    "sistolica": [(217, 180, 30, 60), (258, 180, 30, 60), (302, 180, 30, 60)],
+    "diastolica": [(258, 248, 30, 60), (302, 248, 30, 60)],
+    "pulso": [(278, 322, 22, 45), (306, 322, 22, 45)]
 }
 
 # --- Processar cada grupo ---
