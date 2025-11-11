@@ -16,7 +16,6 @@ CAM_OUTPUT = "cam/output"
 
 # --- Constantes e Lógica de Reconhecimento de Imagem ---
 
-# Dicionário de segmentos do display de 7 segmentos
 DIGITOS = {
     (1,1,1,1,1,1,0): '0',   
     (0,1,1,0,0,0,0): '1',
@@ -33,14 +32,18 @@ DIGITOS = {
     (1,0,0,1,1,1,0): 'C',
     (0,1,1,1,1,0,1): 'd',
     (1,0,0,1,1,1,1): 'E',
-    (1,0,0,0,1,1,1): 'F'
+    (1,0,0,0,1,1,1): 'F',
+    (1,1,0,0,1,1,1): 'P',
+    (0,0,0,0,1,0,1): 'r',
+
 }
+
 
 # Coordenadas fixas dos dígitos (x, y, w, h)
 digitos_coord = {
-    "sistolica": [(285, 48, 33, 60), (330, 48, 33, 60), (375, 47, 33, 60)],
-    "diastolica": [(332, 118, 33, 60), (374, 116, 33, 60)],
-    "pulso": [(353, 193, 22, 45), (382, 191, 22, 45)]
+    "sistolica": [(215, 180, 30, 60), (256, 180, 30, 60), (300, 180, 30, 60)],
+    "diastolica": [(256, 248, 30, 60), (300, 248, 30, 60)],
+    "pulso": [(276, 322, 22, 45), (304, 322, 22, 45)]
 }
 
 def ler_digito(dig_img, debug_img, x0, y0):
@@ -125,7 +128,7 @@ def sync_image_processing() -> dict:
         # dependendo de como a câmera está montada!
         height, width = img.shape[:2]
         center = (width/2, height/2)
-        rotation_matrix = cv2.getRotationMatrix2D(center, 3, 1.0)  
+        rotation_matrix = cv2.getRotationMatrix2D(center, 1, 1.0)  
         img = cv2.warpAffine(img, rotation_matrix, (width, height))
         
         # 6. Converter para escala de cinza
@@ -136,7 +139,7 @@ def sync_image_processing() -> dict:
         img_color = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
         
         # 8. Aplicar blur e threshold
-        blur = cv2.GaussianBlur(img_gray, (11, 11), 0)
+        blur = cv2.GaussianBlur(img_gray, (5, 5), 0)
         img_thresh = cv2.adaptiveThreshold(
             blur, 255,
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -152,7 +155,7 @@ def sync_image_processing() -> dict:
             for (x, y, w, h) in coords:
                 dig_img = img_thresh[y:y+h, x:x+w]
                 numero += ler_digito(dig_img, img_color, x, y)
-                cv2.rectangle(img_thresh, (x, y), (x+w, y+h), (255, 255, 0), 1)
+                cv2.rectangle(img_thresh, (x, y), (x+w, y+h), (255, 255, 0), 2)
             valores[label] = numero
 
         # 10. Salvar imagem de debug final
