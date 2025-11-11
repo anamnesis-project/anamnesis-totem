@@ -264,12 +264,10 @@ async def run_measures_flow(client, message, payload, Session):
                     Session.jsonPost["temperature"] = value
                     log.info(f"Temperature recorded: {value}°C")
                     Session.measures_state += 1
-                    #await client.publish(TOPIC_SCREEN, NEXT_STEP)
                     speach = Measures.get_by_index(Session.measures_state).speach
                     step = Measures.get_by_index(Session.measures_state).step
                     await ui_send_state(client, "measures", speach, step)
                     await client.publish(TOPIC_SPEAK, speach)
-                    await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
 
                 except (IndexError, ValueError):
                     log.warning(f"Invalid temperature '{payload}'")
@@ -358,6 +356,9 @@ async def run_measures_flow(client, message, payload, Session):
                                       Measures.PRESSURE_OPEN_DOOR.index, 
                                       Measures.PRESSURE_START_MONITOR.index]: 
             await client.publish(MIC_START, MIC_START_PAYLOAD)
+
+        if Session.measures_state == Measures.OXYMETER.index:
+            await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
     
     elif message.topic.matches(CAM_OUTPUT):
         if payload.startswith("CAM:ERR"):
