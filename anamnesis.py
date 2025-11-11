@@ -55,7 +55,7 @@ class Forms(Enum):
     OCCUPATION = (6, "occupation", "What is your occupation?")
     MEDICATIONS = (7, "medications", "Are you taking any medications? If so, please list them.")
     ALLERGIES = (8, "allergies", "Do you have any known allergies? If so, please list them.")
-    DISEASES = (9, "diseases", "Do you have any chronic illnesess? If so, please list them.")
+    DISEASES = (9, "diseases", "Do you have any chronic illnesses? If so, please list them.")
 
     @property
     def index(self):
@@ -78,7 +78,7 @@ class Forms(Enum):
 class Measures(Enum):
     TEMPERATURE = (0, "temperature", "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen. Tell me when you are ready")
     OXYMETER = (1, "oxymeter", "Please, put your finger on the oxymeter as shown on the screen.")
-    PRESSURE_OPEN_DOOR = (2, "pressure", "Please, grab the cuff inside the totem and place it on your bare arm, and tell me when you are Im ready...")
+    PRESSURE_OPEN_DOOR = (2, "pressure", "Please, grab the cuff inside the totem and place it on your bare arm, and tell me when you are ready...")
     PRESSURE_START_MONITOR = (3, "pressure", "Please put the cuff back in the cabinet and tell me when it is done")
     PRESSURE_CLOSE_DOOR = (4, "pressure", "")
 
