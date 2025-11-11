@@ -11,6 +11,7 @@ img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 cv2.imwrite("saida_gray.png", img)
 img_color = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 blur = cv2.GaussianBlur(img, (5, 5), 0)
+blur = cv2.GaussianBlur(img, (5, 5), 0)
 img = cv2.adaptiveThreshold(
     blur, 255,
     cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -90,7 +91,7 @@ for label, coords in digitos_coord.items():
     for (x, y, w, h) in coords:
         dig_img = img[y:y+h, x:x+w]
         numero += ler_digito(dig_img, img_color, x, y)
-        cv2.rectangle(img, (x, y), (x+w, y+h), (255, 255, 0), 1)  # amarelo = caixa do dígito
+        cv2.rectangle(img, (x, y), (x+w, y+h), (255, 255, 0), 2)  # amarelo = caixa do dígito
     valores[label] = numero
 
 print("\nLeitura automática:")
