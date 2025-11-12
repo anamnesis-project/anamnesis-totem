@@ -6,7 +6,8 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-api_key = os.environ.get('GEMINI_API_KEY')
+api_key_1 = os.environ.get('GEMINI_API_KEY_1')
+api_key_2 = os.environ.get('GEMINI_API_KEY_2')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 MQTT_BROKER = "localhost"
@@ -16,13 +17,14 @@ LLM_RESPONSE = "llm/response"
 
 GEMINI_API_KEY = '' #get via os
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+client1 = genai.Client(api_key=api_key_1)
+client2 = genai.Client(api_key=api_key_2)
 
 async def async_generate_content(context_to_send: str) -> str:
     try:
-        logging.info("Sending prompt to Gemini...")
+        logging.info("Sending prompt to Gemini using api key 1...")
         response = await asyncio.to_thread(
-            client.models.generate_content,
+            client1.models.generate_content,
             model="gemini-2.5-flash",
             contents=context_to_send
         )
@@ -30,8 +32,23 @@ async def async_generate_content(context_to_send: str) -> str:
         clean_text = response.text.replace('*', '').strip()
         return clean_text
     except Exception as e:
-        logging.error(f"Error calling Gemini API: {e}")
-        return "Error calling Gemini API"
+        error_str = str(e).lower()
+        if "503" in error_str or "429" in error_str:
+            logging.warning(f"Gemini API (key 1) rate-limited or unavailable ({e}). Trying key 2...")
+            try:
+                response = await asyncio.to_thread(
+                    client2.models.generate_content,
+                    model="gemini-2.5-flash",
+                    contents=context_to_send
+                )
+                logging.info("Got response from Gemini (key 2).")
+                return response.text.replace('*', '').strip()
+            except Exception as e2:
+                logging.error(f"Error calling Gemini API with key 2: {e2}")
+                return "Error: Gemini API failed with both keys."
+        else:
+            logging.error(f"Unexpected Gemini API error (key 1): {e}")
+            return "Error calling Gemini API."
 
 async def main():
     try:
