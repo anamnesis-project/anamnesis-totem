@@ -317,7 +317,6 @@ async def run_measures_flow(client, message, payload, Session):
         elif Session.measures_state == Measures.PRESSURE_START_MONITOR.index:
             if payload.startswith("P:OK"):
                 print('CAIU CAM')
-                #await client.publish(SCREEN SHOW RESULT)
                 await client.publish(TOPIC_CAM, 'START READING')
             elif payload.startswith("P:ERR"):
                 log.warning("Start pressure monitor error.")
@@ -354,7 +353,8 @@ async def run_measures_flow(client, message, payload, Session):
             return False #???
         if Session.measures_state in [Measures.TEMPERATURE.index,
                                       Measures.PRESSURE_OPEN_DOOR.index, 
-                                      Measures.PRESSURE_START_MONITOR.index]: 
+                                      Measures.PRESSURE_START_MONITOR.index,
+                                      Measures.PRESSURE_CLOSE_DOOR.index]: 
             await client.publish(MIC_START, MIC_START_PAYLOAD)
 
         if Session.measures_state == Measures.OXYMETER.index:
@@ -373,6 +373,8 @@ async def run_measures_flow(client, message, payload, Session):
             Session.jsonPost["diastolic_pressure"] = diastolic_pressure
             Session.jsonPost["heart_rate"] = heart_rate
             await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
+            Session.measures_state += 1
+            
         
 async def run_interview_flow(client, message, payload, Session):
     if message.topic.matches(SPEAK_RESPONSE):
