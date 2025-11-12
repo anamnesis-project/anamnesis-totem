@@ -199,7 +199,7 @@ async def image_recognition() -> str:
 
         # 3. Validar se a leitura dos dígitos foi bem-sucedida
         if not sistolica or not diastolica or not pulso or \
-           '?' in sistolica or '?' in diastolica or '?' in pulso:
+           '?' in sistolica or '?' in diastolica:
             
             logging.warning(f"Falha na leitura de dígitos. Valores lidos: {valores}")
             return "CAM:ERR:Digit recognition failed"
