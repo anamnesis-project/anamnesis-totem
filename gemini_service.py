@@ -87,11 +87,10 @@ The user's answer comes from a speech-to-text (STT) service, so it may contain i
 4.  **Format Lists:** If the answer contains multiple items, separate them with a comma and a space.
 5.  **Handle Negatives:** If the answer does not make sense or the user does not answer (e.g. "I dont know") output "N/A".
 6.  **Be Concise:** Do not add any explanation or labels to your output.
-7.  **Asked to Repeat:** If the user indicates they do not understand the question or asks to repeat, output "Repeat".
-8.  **Asked to End:** If the user indicates they want to end the conversation, output "End session".
-9.  **Convert height:** If the user provides height in meters, convert to centimeters (e.g. "one point seven five" to "175"). If unsure, return '1'.
-10. **Convert sex:** Return 'M' or 'F'. If unsure, return 'M'.
-11. **Convert birthdate:** Return in format YYYY-MM-DD. If unsure, return '1970-01-01'.
+7.  **Asked to End:** If the user indicates they want to end the conversation, output "End session".
+8.  **Convert height:** If the user provides height in meters, convert to centimeters (e.g. "one point seven five" to "175"). If unsure, return '1'.
+9. **Convert sex:** Return 'M' or 'F'. If unsure, return 'M'.
+10. **Convert birthdate:** Return in format YYYY-MM-DD. If unsure, return '1970-01-01'.
 ## Examples
 
 ---

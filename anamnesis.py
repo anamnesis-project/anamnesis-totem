@@ -32,6 +32,7 @@ UI_RECEIVE = "ui/receive"
 TOPIC_CAM = "cam/input"
 CAM_OUTPUT = "cam/output"
 
+MAX_QUESTIONS = 5
 
 SPEAK_SUCCESS_PAYLOAD = "ok"
 STT_FAIL_PAYLOAD = 'failed'
@@ -39,8 +40,8 @@ MIC_START_PAYLOAD = "start"
 LLM_CONTINUE_PAYLOAD = 'Continue'
 
 FIRST_QUESTION = "What brings you here today?"
+END_SENTENCE = "Thanks for the information. You can leave now."
 LLM_ENOUGH = "I got enough info"
-LLM_REPEAT_PAYLOAD = "Repeat"
 LLM_END_PAYLOAD = "End session"
 FW_FAIL_PAYLOAD = "failed"
 LLM_FAIL_PAYLOAD = "failed"
@@ -226,10 +227,6 @@ async def run_forms_flow(client, message, payload, Session):
         if payload == LLM_FAIL_PAYLOAD:
             log.warning(f"Gemini_service failed: '{payload}'")
             return False #???
-        elif payload == LLM_REPEAT_PAYLOAD:
-            question = Forms.get_by_index(Session.forms_state).question
-            await client.publish(TOPIC_SPEAK, question)
-            return
         elif payload == LLM_END_PAYLOAD:
             #RESET ALL
             return False
@@ -243,8 +240,6 @@ async def run_forms_flow(client, message, payload, Session):
             step =  Measures.get_by_index(Session.measures_state).step
             await ui_send_state(client, "measures", speach, step)
             await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
-            #await client.publish(TOTEM SCREEN)
-            #await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
         else:
             question = Forms.get_by_index(Session.forms_state).question
             step = Forms.get_by_index(Session.forms_state).step
@@ -285,11 +280,9 @@ async def run_measures_flow(client, message, payload, Session):
                     Session.jsonPost["oxygen_saturation"] = value
                     log.info(f"Oxymeter recorded: {value}%")
                     Session.measures_state += 1
-                    #await client.publish(TOPIC_SCREEN, NEXT_STEP)
                     speach = Measures.get_by_index(Session.measures_state).speach
                     step = Measures.get_by_index(Session.measures_state).step
                     await ui_send_state(client, "measures", speach, step)
-                    # await client.publish(TOPIC_SPEAK, speach)
                     await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
                 except (IndexError, ValueError):
                     log.warning(f"Invalid oxymeter '{payload}'")
@@ -301,7 +294,6 @@ async def run_measures_flow(client, message, payload, Session):
         elif Session.measures_state == Measures.PRESSURE_OPEN_DOOR.index: 
             if payload.startswith("P1:OK"): #SUCCESS OPEN DOOR
                 print('abriu')
-                #await client.publish(SCREEN SHOW RESULT)
                 speach = Measures.get_by_index(Session.measures_state).speach
                 step = Measures.get_by_index(Session.measures_state).step
                 await ui_send_state(client, "measures", speach, step)
@@ -389,9 +381,8 @@ async def run_interview_flow(client, message, payload, Session):
             log.warning(f"Mic_stt_service failed: '{payload}'")
             return False #???
         Session.interview.append(payload)
-        if len(Session.interview)/2 >= 1:
-            a=1 #STOP
-            insert_cli(Session.jsonPost, Session.interview, Session)
+        if len(Session.interview)/2 >= MAX_QUESTIONS:
+            return await end_session(Session, client, persist=True)
         prompt = build_llm_prompt(payload, Session)
         await client.publish(TOPIC_PROMPT, prompt)
         return True #???
@@ -400,17 +391,11 @@ async def run_interview_flow(client, message, payload, Session):
         if payload == LLM_FAIL_PAYLOAD:
             log.warning(f"Gemini_service failed: '{payload}'")
             return False #???
-        elif payload == LLM_REPEAT_PAYLOAD:
-            question = Forms.get_by_index(Session.forms_state).question
-            await ui_send_state(client, "interview", question)
-            await client.publish(TOPIC_SPEAK, question)
-            return True
         elif payload == LLM_END_PAYLOAD:
-            #RESET ALL
-            return False
+            return await end_session(Session, client, persist=False)
         elif payload == LLM_ENOUGH:
             log.info("Got enough info")
-            Session.main_state = State.IDLE
+            return await end_session(Session, client, persist=True)
         Session.interview.append(payload)
         Session.dinamic_context += "\n[You]: " + payload
         # TODO is this correct??
@@ -430,13 +415,13 @@ def build_llm_prompt(message, Session):
         Session.dinamic_context += "\n[Patient]: " + message
         return Session.dinamic_context
 
-def insert_cli(jsonPost, interview, Session):
+def insert_cli(Session):
     url = 'https://kickless-untaxing-neil.ngrok-free.dev/reports'
     i_list = []
-    for i in range(0, len(interview), 2):
+    for i in range(0, len(Session.interview), 2):
         item = {
-            "question": interview[i],
-            "answer": interview[i+1]
+            "question": Session.interview[i],
+            "answer": Session.interview[i+1]
         }
         i_list.append(item)
     age = Session.jsonPost.get("AGE")
@@ -456,22 +441,30 @@ def insert_cli(jsonPost, interview, Session):
             "name": "Luis Inacio",
             "cpf": "11111111111",
             "dateOfBirth": date_of_birth,
-            "sex": Session.jsonPost.get("SEX"),  # .get() simples para campos diretos
+            "sex": Session.jsonPost.get("SEX"),
         },
         "weight": weight,
         "height": height,
-        "heartRate": Session.jsonPost.get("heart_rate"), # .get() simples
-        "systolicPressure": Session.jsonPost.get('systolic_pressure'), # .get() simples
-        "diastolicPressure": Session.jsonPost.get('diastolic_pressure'), # .get() simples
-        "temperature": Session.jsonPost.get('temperature'), # .get() simples
-        "oxygenSaturation": Session.jsonPost.get('oxygen_saturation'), # .get() simples
+        "heartRate": Session.jsonPost.get("heart_rate"),
+        "systolicPressure": Session.jsonPost.get('systolic_pressure'),
+        "diastolicPressure": Session.jsonPost.get('diastolic_pressure'),
+        "temperature": Session.jsonPost.get('temperature'),
+        "oxygenSaturation": Session.jsonPost.get('oxygen_saturation'),
         "medications": medications,
         "allergies": allergies,
         "diseases": diseases,
-        "interview": i_list  # 'i_list' já foi definido fora, então não precisa de .get()
+        "interview": i_list
     }
+    print(requestBody)
     response = requests.post(url, json=requestBody)
-    print(response)
+    print('\nstatus code: ' + response.status_code)
+    print('\nresponse: ' + response.text)
+
+async def end_session(Session, client, persist):
+    if persist:
+        insert_cli(Session)
+    Session.reset()
+    await client.publish(TOPIC_SPEAK, END_SENTENCE)
 
 async def ui_start(client):
     await ui_send_state(client, "forms", "What is your name?", "name")
