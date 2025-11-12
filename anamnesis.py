@@ -212,7 +212,8 @@ async def run_forms_flow(client, message, payload, Session):
         if payload != SPEAK_SUCCESS_PAYLOAD:
             log.warning(f"Audio_player_service failed: '{payload}'")
             return False #???
-        await client.publish(MIC_START, MIC_START_PAYLOAD)
+        if Session.forms_state <= Forms.AGE.index:
+            await client.publish(MIC_START, MIC_START_PAYLOAD)
             
     elif message.topic.matches(TOPIC_TRANSCRIPTION):
         if payload == STT_FAIL_PAYLOAD:
