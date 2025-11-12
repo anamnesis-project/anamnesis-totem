@@ -1,6 +1,6 @@
 import cv2
 
-img = cv2.imread("2025-11-11-185902.jpg")
+img = cv2.imread("2025-11-11-211256.jpg")
 height, width = img.shape[:2]
 center = (width/2, height/2)
 
@@ -44,16 +44,16 @@ DIGITOS = {
 
 def ler_digito(dig_img, debug_img, x0, y0):
     h, w = dig_img.shape
-    on = lambda seg: cv2.countNonZero(seg) / seg.size > 0.3
+    on = lambda seg: cv2.countNonZero(seg) / seg.size > 0.2
 
     segments = [
-        ((w*0.2, 0, w*0.6, h*0.15)),       # A
-        ((w*0.8, h*0.1, w*0.2, h*0.4)),    # B
-        ((w*0.8, h*0.55, w*0.2, h*0.4)),   # C
-        ((w*0.2, h*0.85, w*0.6, h*0.15)),  # D
-        ((0, h*0.55, w*0.2, h*0.4)),       # E
-        ((0, h*0.1, w*0.2, h*0.4)),        # F
-        ((w*0.2, h*0.45, w*0.6, h*0.15))   # G
+        ((w*0.28 , 0      , w*0.51,  h*0.22)),  # A
+        ((w*0.78  , h*0.1  , w*0.30, h*0.4)),   # B
+        ((w*0.78  , h*0.55 , w*0.30, h*0.4)),   # C
+        ((w*0.28 , h*0.78 , w*0.51, h*0.22)),  # D
+        ((0      , h*0.55 , w*0.30, h*0.4)),   # E
+        ((0      , h*0.1  , w*0.30, h*0.4)),   # F
+        ((w*0.28 , h*0.38 , w*0.51, h*0.22))   # G
     ]
 
     estado = []
@@ -78,9 +78,9 @@ def ler_digito(dig_img, debug_img, x0, y0):
 
 # --- Coordenadas fixas dos dígitos (x, y, w, h) ---
 digitos_coord = {
-    "sistolica": [(217, 180, 30, 60), (258, 180, 30, 60), (302, 180, 30, 60)],
-    "diastolica": [(258, 248, 30, 60), (302, 248, 30, 60)],
-    "pulso": [(278, 322, 22, 45), (306, 322, 22, 45)]
+    "sistolica": [(217, 178, 35, 65), (258, 178, 35, 65), (302, 178, 35, 65)],
+    "diastolica": [(258, 246, 35, 65), (302, 246, 35, 65)],
+    "pulso": [(278, 320, 25, 48), (305, 320, 25, 48)]
 }
 
 # --- Processar cada grupo ---
