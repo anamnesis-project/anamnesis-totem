@@ -13,7 +13,7 @@ MQTT_PORT = 1883
 TOPIC_SPEAK = "voice/speak/request" 
 SPEAK_RESPONSE = "voice/speak/response"
 # MQTT topic to listen for text
-WEBSOCKET_URI = "ws://" + server_path + "/ws/tts" # TTS SERVER WebSocket URI
+WEBSOCKET_URI = "wss://" + server_path + "/ws/tts" # TTS SERVER WebSocket URI
 AUDIO_FILENAME = "speak.wav" # temporary file
 
 SPEAKER_SUCCESS_PAYLOAD = 'ok'
