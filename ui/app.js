@@ -192,7 +192,7 @@ async function updateState(state, step, msg) {
             break;
         }
         case states.INTERVIEW: {
-            await loadView("interview");
+            await loadView("interview", msg);
             break;
         }
         case states.FINISHED: {
