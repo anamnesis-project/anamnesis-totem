@@ -194,12 +194,14 @@ async def image_recognition() -> str:
 
         # 2. Obter os valores do dicionário
         sistolica = valores.get("sistolica")
+        print(sistolica)
         diastolica = valores.get("diastolica")
+        print(diastolica)
         pulso = valores.get("pulso")
+        print(pulso)
 
         # 3. Validar se a leitura dos dígitos foi bem-sucedida
-        if not sistolica or not diastolica or not pulso or \
-           '?' in sistolica or '?' in diastolica:
+        if ((not sistolica) or (not diastolica) or (not pulso)) or (('?' in sistolica) or ('?' in diastolica)):
             
             logging.warning(f"Falha na leitura de dígitos. Valores lidos: {valores}")
             return "CAM:ERR:Digit recognition failed"
