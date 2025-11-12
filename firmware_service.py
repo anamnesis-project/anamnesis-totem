@@ -13,7 +13,7 @@ FW_INPUT = "fw/input"
 FW_OUTPUT = "fw/output"
 
 try:
-    ser = serial.Serial('/dev/ttyAMA0', 115200, timeout=10)
+    ser = serial.Serial('/dev/ttyAMA0', 115200, timeout=30)
     ser.flush()
     print("Serial port connected")
 except serial.SerialException as e:
@@ -22,7 +22,6 @@ except serial.SerialException as e:
 
 async def fw_communication(command: str) -> str:
     try:
-        print('OXI') #DEBUG
         if command == 'TEMPERATURE':
             command = 'T\n'
         elif command == 'OXYMETER':
@@ -53,11 +52,11 @@ async def fw_communication(command: str) -> str:
             return False
         """
         response = response_bytes.decode('utf-8').rstrip()
-        logging.info(f"Raw bytes received from FW: {response_bytes}") # <-- NOVO LOG
+        logging.info(f"Raw bytes received from FW: {response_bytes}")
         
         if not response_bytes:
             logging.warning("No response from firmware (timeout)")
-            return "FW_TIMEOUT" # Retorne um erro claro
+            return "FW_TIMEOUT"
         
         print(f"[Pi <- FW] Response: {response}")
         return response
