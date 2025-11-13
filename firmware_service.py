@@ -13,7 +13,7 @@ FW_INPUT = "fw/input"
 FW_OUTPUT = "fw/output"
 
 try:
-    ser = serial.Serial('/dev/ttyAMA0', 115200, timeout=30)
+    ser = serial.Serial('/dev/ttyAMA0', 115200, timeout=40)
     ser.flush()
     print("Serial port connected")
 except serial.SerialException as e:
