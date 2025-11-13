@@ -427,10 +427,20 @@ def insert_cli(Session):
         i_list.append(item)
     age = Session.jsonPost.get("AGE")
     date_of_birth = f"{age}T00:00:00Z" if age else None
+
     weight_val = Session.jsonPost.get("WEIGHT")
-    weight = int(weight_val) if weight_val is not None else None
+    try:
+        weight = int(weight_val) if weight_val is not None else 67
+    except ValueError:
+        weight = 67
+
+
     height_val = Session.jsonPost.get("HEIGHT")
-    height = int(height_val) if height_val is not None else None
+    try:
+        height = int(height_val) if height_val is not None else 175
+    except ValueError:
+        height = 175
+
     meds_str = Session.jsonPost.get("MEDICATIONS")
     medications = [med.strip() for med in meds_str.split(',')] if meds_str else None
     allergies_str = Session.jsonPost.get("ALLERGIES")
