@@ -43,7 +43,7 @@ DIGITOS = {
 digitos_coord = {
     "sistolica": [(217, 178, 35, 65), (258, 178, 35, 65), (302, 178, 35, 65)],
     "diastolica": [(258, 246, 35, 65), (302, 246, 35, 65)],
-    "pulso": [(281, 320, 25, 48), (306, 320, 25, 48)]
+    "pulso": [(280, 320, 25, 48), (306, 320, 25, 48)]
 }
 
 def ler_digito(dig_img, debug_img, x0, y0):
@@ -154,12 +154,12 @@ def sync_image_processing() -> dict:
             numero = ""
             for (x, y, w, h) in coords:
                 dig_img = img_thresh[y:y+h, x:x+w]
-                numero += ler_digito(dig_img, img_color, x, y)
+                numero += ler_digito(dig_img, img_thresh, x, y)
                 cv2.rectangle(img_thresh, (x, y), (x+w, y+h), (255, 255, 0), 2)
             valores[label] = numero
 
         # 10. Salvar imagem de debug final
-        cv2.imwrite("debug_segmentos.png", img_color)
+        cv2.imwrite("debug_segmentos.png", img_thresh)
         
         logging.info(f"Leitura automática concluída: {valores}")
         return valores
