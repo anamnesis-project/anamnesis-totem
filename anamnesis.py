@@ -49,7 +49,7 @@ LLM_FAIL_PAYLOAD = "failed"
 class Forms(Enum):
     NAME = (0, "name", "Hi, I am Anna, I'm a virtual assistant and I'm here to collect some information to speed up your check-in. Please, answer my questions and follow my instructions. Tell me, What is your name?")
     CPF = (1, "cpf", "What is your CPF?")
-    AGE = (2, "age", "How old are you?")
+    AGE = (2, "age", "What is you day of birth?")
     SEX = (3, "sex", "What is your biological sex?")
     HEIGHT = (4, "height", "What is your height in centimeters?")
     WEIGHT = (5, "weight", "What is your weight in kilograms?")
@@ -213,7 +213,7 @@ async def run_forms_flow(client, message, payload, Session):
         if payload != SPEAK_SUCCESS_PAYLOAD:
             log.warning(f"Audio_player_service failed: '{payload}'")
             return False #???
-        if Session.forms_state <= Forms.AGE.index:
+        if Session.forms_state >= Forms.AGE.index:
             await client.publish(MIC_START, MIC_START_PAYLOAD)
             
     elif message.topic.matches(TOPIC_TRANSCRIPTION):
@@ -458,7 +458,7 @@ def insert_cli(Session):
     }
     print(requestBody)
     response = requests.post(url, json=requestBody)
-    print('\nstatus code: ' + response.status_code)
+    print('\nstatus code: ' + str(response.status_code))
     print('\nresponse: ' + response.text)
 
 async def end_session(Session, client, persist):
