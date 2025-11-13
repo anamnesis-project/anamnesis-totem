@@ -49,7 +49,7 @@ LLM_FAIL_PAYLOAD = "failed"
 class Forms(Enum):
     NAME = (0, "name", "Hi, I am Anna, I'm a virtual assistant and I'm here to collect some information to speed up your check-in. Please, answer my questions and follow my instructions. Tell me, What is your name?")
     CPF = (1, "cpf", "What is your CPF?")
-    AGE = (2, "age", "What is you day of birth?")
+    AGE = (2, "age", "What is your day of birth?")
     SEX = (3, "sex", "What is your biological sex?")
     HEIGHT = (4, "height", "What is your height in centimeters?")
     WEIGHT = (5, "weight", "What is your weight in kilograms?")
