@@ -257,7 +257,7 @@ async def run_measures_flow(client, message, payload, Session):
                 try:
                     parts = payload.split(':')
                     value = float(parts[2])
-                    Session.jsonPost["temperature"] = value
+                    Session.jsonPost["temperature"] = (value + 4.5)
                     log.info(f"Temperature recorded: {value}°C")
                     Session.measures_state += 1
                     speach = Measures.get_by_index(Session.measures_state).speach
@@ -439,8 +439,8 @@ def insert_cli(Session):
     diseases = [dis.strip() for dis in diseases_str.split(',')] if diseases_str else None
     requestBody = {
         "patient": {
-            "name": "Luis Inacio",
-            "cpf": "11111111111",
+            "name": Session.jsonPost['patient'].get("name"),
+            "cpf": Session.jsonPost['patient'].get("cpf"),
             "dateOfBirth": date_of_birth,
             "sex": Session.jsonPost.get("SEX"),
         },
