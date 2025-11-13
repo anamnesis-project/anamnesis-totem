@@ -400,6 +400,7 @@ async def run_interview_flow(client, message, payload, Session):
         Session.dinamic_context += "\n[You]: " + payload
         # TODO is this correct??
         await client.publish(TOPIC_SPEAK, payload)
+        await ui_send_state(client, "interview", payload)
         
 def build_llm_prompt(message, Session):
     if Session.main_state == State.FORMS:
@@ -465,12 +466,13 @@ async def end_session(Session, client, persist):
         insert_cli(Session)
     Session.reset()
     await client.publish(TOPIC_SPEAK, END_SENTENCE)
+    await ui_cancel(client)
 
 async def ui_start(client):
     await ui_send_state(client, "forms", "What is your name?", "name")
 
 async def ui_cancel(client):
-    await ui_send_state(client, "IDLE", "")
+    await ui_send_state(client, "idle", "")
 
 async def ui_send_state(client, state, msg, step=""):
     payload = {
