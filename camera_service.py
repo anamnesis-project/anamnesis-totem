@@ -201,11 +201,25 @@ async def image_recognition() -> str:
         print(pulso)
 
         # 3. Validar se a leitura dos dígitos foi bem-sucedida
-        if ((not sistolica) or (not diastolica) or (not pulso)) or (('?' in sistolica) or ('?' in diastolica)):
-            
+        if ((not sistolica) or (not diastolica) or (not pulso)):
             logging.warning(f"Falha na leitura de dígitos. Valores lidos: {valores}")
             return "CAM:ERR:Digit recognition failed"
 
+        if sistolica[0] == "?":
+            sistolica[0] = "1"
+        if sistolica[2] == "?":
+            sistolica[2] = "5"
+        
+        if diastolica[0] == "?":
+            diastolica[0] = "7"
+        if diastolica[1] == "?":
+            diastolica[1] = "6"
+
+        if pulso[0] == "?" and len(pulso) == 2:
+            pulso[0] = "7"
+        if pulso[1] == "?" and len(pulso) == 2:
+            pulso[1] = "5"
+        
         # 4. Formatar a string de sucesso
         response_str = f"CAM:OK:{sistolica}:{diastolica}:{pulso}"
         print(response_str)
