@@ -478,6 +478,7 @@ def insert_cli(Session):
         },
         "weight": weight,
         "height": height,
+        "occupation": Session.jsonPost.get("OCCUPATION"),
         "heartRate": Session.jsonPost.get("heart_rate"),
         "systolicPressure": Session.jsonPost.get('systolic_pressure'),
         "diastolicPressure": Session.jsonPost.get('diastolic_pressure'),
