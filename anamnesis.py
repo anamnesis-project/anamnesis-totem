@@ -253,6 +253,13 @@ async def run_measures_flow(client, message, payload, Session):
             log.warning(f"Firmware_service failed: '{payload}'")
             return False #???
         if Session.measures_state == Measures.TEMPERATURE.index:
+            if payload in ['FW_TIMEOUT', 'Error communication with FW']:
+                Session.jsonPost["temperature"] = None
+                Session.measures_state += 1
+                speach = Measures.get_by_index(Session.measures_state).speach
+                step = Measures.get_by_index(Session.measures_state).step
+                await ui_send_state(client, "measures", speach, step)
+                await client.publish(TOPIC_SPEAK, speach)
             if payload.startswith("T:OK"):
                 try:
                     parts = payload.split(':')
@@ -273,6 +280,13 @@ async def run_measures_flow(client, message, payload, Session):
                 log.warning(f"Unexpected temperature payload: '{payload}'")
         
         elif Session.measures_state == Measures.OXYMETER.index:
+            if payload in ['FW_TIMEOUT', 'Error communication with FW']:
+                Session.jsonPost["oxygen_saturation"] = None
+                Session.measures_state += 1
+                speach = Measures.get_by_index(Session.measures_state).speach
+                step = Measures.get_by_index(Session.measures_state).step
+                await ui_send_state(client, "measures", speach, step)
+                await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
             if payload.startswith("O:OK"):
                 try:
                     parts = payload.split(':')
@@ -356,6 +370,14 @@ async def run_measures_flow(client, message, payload, Session):
     elif message.topic.matches(CAM_OUTPUT):
         if payload.startswith("CAM:ERR"):
             log.warning("Camera error during pressure measurement.")
+            systolic_pressure = None
+            diastolic_pressure = None
+            heart_rate = None
+            Session.jsonPost["systolic_pressure"] = systolic_pressure
+            Session.jsonPost["diastolic_pressure"] = diastolic_pressure
+            Session.jsonPost["heart_rate"] = heart_rate
+            await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
+            Session.measures_state += 1
             return False
         elif payload.startswith("CAM:OK"):
             parts = payload.split(':')
