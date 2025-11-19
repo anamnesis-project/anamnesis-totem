@@ -41,6 +41,7 @@ LLM_CONTINUE_PAYLOAD = 'Continue'
 
 FIRST_QUESTION = "What brings you here today?"
 END_SENTENCE = "Thanks for the information. You can leave now."
+REMOVE_FINGER = "Remove the finger from the oxymeter."
 LLM_ENOUGH = "I got enough info"
 LLM_END_PAYLOAD = "End session"
 FW_FAIL_PAYLOAD = "failed"
@@ -293,6 +294,7 @@ async def run_measures_flow(client, message, payload, Session):
                     value = int(parts[2])
                     Session.jsonPost["oxygen_saturation"] = value
                     log.info(f"Oxymeter recorded: {value}%")
+                    await client.publish(TOPIC_SPEAK, REMOVE_FINGER)
                     Session.measures_state += 1
                     speach = Measures.get_by_index(Session.measures_state).speach
                     step = Measures.get_by_index(Session.measures_state).step
