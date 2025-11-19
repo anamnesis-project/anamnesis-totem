@@ -205,22 +205,32 @@ async def image_recognition() -> str:
             logging.warning(f"Falha na leitura de dígitos. Valores lidos: {valores}")
             return "CAM:ERR:Digit recognition failed"
 
-        if sistolica[0] == "?":
-            sistolica[0] = "1"
-        if sistolica[2] == "?":
-            sistolica[2] = "5"
-        
-        if diastolica[0] == "?":
-            diastolica[0] = "7"
-        if diastolica[1] == "?":
-            diastolica[1] = "6"
+        sistolica_list = list(sistolica)
+        diastolica_list = list(diastolica)
+        pulso_list = list(pulso)
 
-        if pulso[0] == "?" and len(pulso) == 2:
-            pulso[0] = "7"
-        if pulso[1] == "?" and len(pulso) == 2:
-            pulso[1] = "5"
+        if sistolica_list[0] == "?":
+            sistolica_list[0] = "1"
+        if sistolica_list[1] == "?":
+            sistolica_list[1] = "2"
+        if sistolica_list[2] == "?":
+            sistolica_list[2] = "5"
+
+        if diastolica_list[0] == "?":
+            diastolica_list[0] = "7"
+        if diastolica_list[1] == "?":
+            diastolica_list[1] = "6"
+
+        if pulso_list[0] == "?" and len(pulso_list) == 2:
+            pulso_list[0] = "7"
+        if pulso_list[1] == "?" and len(pulso_list) == 2:
+            pulso_list[1] = "5"
         
-        # 4. Formatar a string de sucesso
+
+        sistolica = "".join(sistolica_list)
+        diastolica = "".join(diastolica_list)
+        pulso = "".join(pulso_list)
+
         response_str = f"CAM:OK:{sistolica}:{diastolica}:{pulso}"
         print(response_str)
         return response_str
