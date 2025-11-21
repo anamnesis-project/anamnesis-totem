@@ -410,7 +410,7 @@ void loop() {
 
         case SERVO1_BACKWARD:
             Serial.println("Retire o o dedo do sensor.");
-            delay(1600);
+            delay(5750);
             servo1.write(120);
             delay(500);
             currentState = IDLE;
