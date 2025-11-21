@@ -25,8 +25,6 @@ SPEAK_RESPONSE = "voice/speak/response"
 MIC_START = "voice/mic_stt/start"
 MIC_STOP = "voice/mic_stt/stop"
 TOPIC_TRANSCRIPTION = "voice/mic_stt/transcription" 
-TOPIC_DB_REQUEST = "db/request" 
-TOPIC_DB_RESPONSE = "db/response"
 UI_SEND = "ui/send"
 UI_RECEIVE = "ui/receive"
 TOPIC_CAM = "cam/input"
@@ -44,7 +42,7 @@ END_SENTENCE = "Thanks for the information. You can leave now."
 REMOVE_FINGER = "Remove the finger from the oxymeter."
 LLM_ENOUGH = "I got enough info"
 LLM_END_PAYLOAD = "End session"
-FW_FAIL_PAYLOAD = "failed"
+FW_FAIL_PAYLOAD = "FW:ERR"
 LLM_FAIL_PAYLOAD = "failed"
 
 class Forms(Enum):
@@ -153,7 +151,6 @@ async def main():
             await client.subscribe(TOPIC_TRANSCRIPTION)
             await client.subscribe(FW_OUTPUT)
             await client.subscribe(LLM_RESPONSE)
-            await client.subscribe(TOPIC_DB_RESPONSE)
             await client.subscribe(UI_RECEIVE)
             await client.subscribe(CAM_OUTPUT)
             log.info(f"Connected to Broker {MQTT_BROKER}.")
@@ -234,7 +231,7 @@ async def run_forms_flow(client, message, payload, Session):
         Session.jsonPost[Forms.get_by_index(Session.forms_state).name] = payload
         Session.forms_state += 1
         print('form state:', Session.forms_state)
-        if Session.forms_state >= len(Forms): #DISEASES
+        if Session.forms_state >= len(Forms): #LAST QUESTION
             Session.main_state = State.MEASURES
             print('Changing to MEASURES')
             speach = Measures.get_by_index(Session.measures_state).speach
@@ -248,9 +245,9 @@ async def run_forms_flow(client, message, payload, Session):
             await client.publish(TOPIC_SPEAK, question)
 
 async def run_measures_flow(client, message, payload, Session):
-    if message.topic.matches(FW_OUTPUT):
+    async def handle_firmware():
         print('caiu fw: ' + str(Session.measures_state))
-        if payload == FW_FAIL_PAYLOAD:
+        if payload.startswith(FW_FAIL_PAYLOAD):
             log.warning(f"Firmware_service failed: '{payload}'")
             return False #???
         if Session.measures_state == Measures.TEMPERATURE.index:
@@ -275,10 +272,8 @@ async def run_measures_flow(client, message, payload, Session):
 
                 except (IndexError, ValueError):
                     log.warning(f"Invalid temperature '{payload}'")
-            elif payload.startswith("T:ERR"):
+            elif payload.startswith(FW_FAIL_PAYLOAD):
                 log.warning("Temperature measurement error.")
-            else:
-                log.warning(f"Unexpected temperature payload: '{payload}'")
         
         elif Session.measures_state == Measures.OXYMETER.index:
             if payload in ['FW_TIMEOUT', 'Error communication with FW']:
@@ -302,10 +297,8 @@ async def run_measures_flow(client, message, payload, Session):
                     await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
                 except (IndexError, ValueError):
                     log.warning(f"Invalid oxymeter '{payload}'")
-            elif payload.startswith("O:ERR"):
+            elif payload.startswith(FW_FAIL_PAYLOAD):
                 log.warning("Oxymeter measurement error.")
-            else:
-                log.warning(f"Unexpected oxymeter payload: '{payload}'")
 
         elif Session.measures_state == Measures.PRESSURE_OPEN_DOOR.index: 
             if payload.startswith("P1:OK"): #SUCCESS OPEN DOOR
@@ -318,48 +311,44 @@ async def run_measures_flow(client, message, payload, Session):
                 #VOICE COMMAND TO START MONITORING
                 print('COMANDO PARA INICIAR MONITORAMENTO DE PRESSAO')
 
-            elif payload.startswith("P1:ERR"):
+            elif payload.startswith(FW_FAIL_PAYLOAD):
                 log.warning("Open pressure monitor door error.")
-            else:
-                log.warning(f"Unexpected open pressure monitor door payload: '{payload}'")
 
         elif Session.measures_state == Measures.PRESSURE_START_MONITOR.index:
             if payload.startswith("P:OK"):
                 print('CAIU CAM')
                 await client.publish(TOPIC_CAM, 'START READING')
-            elif payload.startswith("P:ERR"):
+            elif payload.startswith(FW_FAIL_PAYLOAD):
                 log.warning("Start pressure monitor error.")
-            else:
-                log.warning(f"Unexpected start pressure monitor payload: '{payload}'")
 
         elif Session.measures_state == Measures.PRESSURE_CLOSE_DOOR.index:
             if payload.startswith("P2:OK"):
                 Session.main_state = State.INTERVIEW
                 return True
-            elif payload.startswith("P2:ERR"):
+            elif payload.startswith(FW_FAIL_PAYLOAD):
                 log.warning("Close pressure monitor door error.")
-            else:
-                log.warning(f"Unexpected close pressure monitor door payload: '{payload}'")
-
-    elif message.topic.matches(TOPIC_TRANSCRIPTION):
+    
+    ###########################################################################################
+    async def handle_transcription():
         if payload == STT_FAIL_PAYLOAD:
             log.warning(f"Mic_stt_service failed: '{payload}'")
-            return False #???
-        prompt = build_llm_prompt(payload, Session)
-        await client.publish(TOPIC_PROMPT, prompt)
+        else:
+            prompt = build_llm_prompt(payload, Session)
+            await client.publish(TOPIC_PROMPT, prompt)
 
-    elif message.topic.matches(LLM_RESPONSE):
+    ###########################################################################################
+    async def handle_llm():
         if payload == LLM_CONTINUE_PAYLOAD:
             await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
         else:
             log.warning(f"Unexpected start pressure monitor payload: '{payload}'")
             await client.publish(MIC_START, MIC_START_PAYLOAD)
-            return False
-
-    elif message.topic.matches(SPEAK_RESPONSE):
+        
+    ###########################################################################################
+    async def handle_speaker():
         if payload != SPEAK_SUCCESS_PAYLOAD:
             log.warning(f"Audio_player_service falhou: '{payload}'")
-            return False #???
+            return
         if Session.measures_state in [Measures.TEMPERATURE.index,
                                       Measures.PRESSURE_OPEN_DOOR.index, 
                                       Measures.PRESSURE_START_MONITOR.index,
@@ -368,20 +357,10 @@ async def run_measures_flow(client, message, payload, Session):
 
         if Session.measures_state == Measures.OXYMETER.index:
             await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
-    
-    elif message.topic.matches(CAM_OUTPUT):
-        if payload.startswith("CAM:ERR"):
-            log.warning("Camera error during pressure measurement.")
-            systolic_pressure = None
-            diastolic_pressure = None
-            heart_rate = None
-            Session.jsonPost["systolic_pressure"] = systolic_pressure
-            Session.jsonPost["diastolic_pressure"] = diastolic_pressure
-            Session.jsonPost["heart_rate"] = heart_rate
-            await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
-            Session.measures_state += 1
-            return False
-        elif payload.startswith("CAM:OK"):
+
+    ###########################################################################################
+    async def handle_cam():
+        if payload.startswith("CAM:OK"):
             parts = payload.split(':')
             systolic_pressure = int(parts[2])
             diastolic_pressure = int(parts[3])
@@ -389,9 +368,31 @@ async def run_measures_flow(client, message, payload, Session):
             Session.jsonPost["systolic_pressure"] = systolic_pressure
             Session.jsonPost["diastolic_pressure"] = diastolic_pressure
             Session.jsonPost["heart_rate"] = heart_rate
-            await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
-            Session.measures_state += 1
-            
+        else:
+            log.warning("Camera error during pressure measurement.")
+            Session.jsonPost["systolic_pressure"] = None
+            Session.jsonPost["diastolic_pressure"] = None
+            Session.jsonPost["heart_rate"] = None
+        await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
+        Session.measures_state += 1
+
+    ###########################################################################################
+    topic_handlers = {
+        FW_OUTPUT: handle_firmware,
+        TOPIC_TRANSCRIPTION: handle_transcription,
+        LLM_RESPONSE: handle_llm,
+        SPEAK_RESPONSE: handle_speaker,
+        CAM_OUTPUT: handle_cam
+    }
+
+    topic_key = str(message.topic)
+    handler = topic_handlers.get(topic_key)
+
+    if handler:
+        return await handler()
+    else:
+        log.warning(f"Topic handler not found for: {topic_key}")
+        return False
         
 async def run_interview_flow(client, message, payload, Session):
     if message.topic.matches(SPEAK_RESPONSE):
