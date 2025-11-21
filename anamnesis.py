@@ -3,7 +3,6 @@ import aiomqtt as mqtt
 from gemini_service import process_answer_context, interview_context, measure_context
 from enum import Enum
 import json
-import os
 import logging
 import requests
 
@@ -194,7 +193,7 @@ async def main():
         log.info("Service ended by user")
 
 async def run_forms_flow(client, message, payload, Session):
-    if message.topic.matches(UI_RECEIVE):
+    async def handle_ui():
         ui_message = json.loads(payload)
         if ui_message.get("type") == "command":
             return
@@ -207,21 +206,21 @@ async def run_forms_flow(client, message, payload, Session):
         await ui_send_state(client, "forms", question, step)
         await client.publish(TOPIC_SPEAK, question)
 
-    elif message.topic.matches(SPEAK_RESPONSE):
+    async def handle_speaker():
         if payload != SPEAK_SUCCESS_PAYLOAD:
             log.warning(f"Audio_player_service failed: '{payload}'")
             return False #???
         if Session.forms_state >= Forms.AGE.index:
             await client.publish(MIC_START, MIC_START_PAYLOAD)
             
-    elif message.topic.matches(TOPIC_TRANSCRIPTION):
+    async def handle_transcription():
         if payload == STT_FAIL_PAYLOAD:
             log.warning(f"Mic_stt_service failed: '{payload}'")
             return False #???
         content = build_llm_prompt(payload, Session)
         await client.publish(TOPIC_PROMPT, content)
 
-    elif message.topic.matches(LLM_RESPONSE):
+    async def handle_llm():
         if payload == LLM_FAIL_PAYLOAD:
             log.warning(f"Gemini_service failed: '{payload}'")
             return False #???
@@ -243,6 +242,22 @@ async def run_forms_flow(client, message, payload, Session):
             step = Forms.get_by_index(Session.forms_state).step
             await ui_send_state(client, "forms", question, step)
             await client.publish(TOPIC_SPEAK, question)
+
+    topic_handlers = {
+        TOPIC_TRANSCRIPTION: handle_transcription,
+        LLM_RESPONSE: handle_llm,
+        SPEAK_RESPONSE: handle_speaker,
+        UI_RECEIVE: handle_ui
+    }
+
+    topic_key = str(message.topic)
+    handler = topic_handlers.get(topic_key)
+
+    if handler:
+        return await handler()
+    else:
+        log.warning(f"Topic handler not found for: {topic_key}")
+        return False
 
 async def run_measures_flow(client, message, payload, Session):
     async def handle_firmware():
@@ -395,13 +410,13 @@ async def run_measures_flow(client, message, payload, Session):
         return False
         
 async def run_interview_flow(client, message, payload, Session):
-    if message.topic.matches(SPEAK_RESPONSE):
+    async def handle_speaker():
         if payload != SPEAK_SUCCESS_PAYLOAD:
             log.warning(f"Audio_player_service falhou: '{payload}'")
             return False #???
         await client.publish(MIC_START, MIC_START_PAYLOAD)
             
-    elif message.topic.matches(TOPIC_TRANSCRIPTION):
+    async def handle_transcription():
         if payload == STT_FAIL_PAYLOAD:
             log.warning(f"Mic_stt_service failed: '{payload}'")
             return False #???
@@ -412,7 +427,7 @@ async def run_interview_flow(client, message, payload, Session):
         await client.publish(TOPIC_PROMPT, prompt)
         return True #???
 
-    elif message.topic.matches(LLM_RESPONSE):
+    async def handle_llm():
         if payload == LLM_FAIL_PAYLOAD:
             log.warning(f"Gemini_service failed: '{payload}'")
             return False #???
@@ -423,9 +438,23 @@ async def run_interview_flow(client, message, payload, Session):
             return await end_session(Session, client, persist=True)
         Session.interview.append(payload)
         Session.dinamic_context += "\n[You]: " + payload
-        # TODO is this correct??
         await client.publish(TOPIC_SPEAK, payload)
         await ui_send_state(client, "interview", payload)
+
+    topic_handlers = {
+        TOPIC_TRANSCRIPTION: handle_transcription,
+        LLM_RESPONSE: handle_llm,
+        SPEAK_RESPONSE: handle_speaker,
+    }
+
+    topic_key = str(message.topic)
+    handler = topic_handlers.get(topic_key)
+
+    if handler:
+        return await handler()
+    else:
+        log.warning(f"Topic handler not found for: {topic_key}")
+        return False
         
 def build_llm_prompt(message, Session):
     if Session.main_state == State.FORMS:
