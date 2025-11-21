@@ -56,14 +56,14 @@ async def fw_communication(command: str) -> str:
         
         if not response_bytes:
             logging.warning("No response from firmware (timeout)")
-            return "FW_TIMEOUT"
+            return "FW:ERR:TIMEOUT"
         
         print(f"[Pi <- FW] Response: {response}")
         return response
 
     except Exception as e:
         logging.error(f"Error communication with FW: {e}")
-        return "Error communication with FW"
+        return "FW:ERR"
 
 async def main():
     try:
@@ -77,7 +77,6 @@ async def main():
                     command = message.payload.decode('utf-8')
                     logging.info(f"Received command: {command}")
                     response = await fw_communication(command)
-                    print("sending: " + response)
                     await client.publish(FW_OUTPUT, response)
                         
     except mqtt.exceptions.MqttError as e:
