@@ -208,22 +208,23 @@ async def image_recognition() -> str:
         sistolica_list = list(sistolica)
         diastolica_list = list(diastolica)
         pulso_list = list(pulso)
+        not_digits = ["?", "A", "b", "C", "d", "E", "F", "P", "r"]
 
-        if sistolica_list[0] == "?":
+        if sistolica_list[0] in not_digits:
             sistolica_list[0] = "1"
-        if sistolica_list[1] == "?":
+        if sistolica_list[1] in not_digits:
             sistolica_list[1] = "2"
-        if sistolica_list[2] == "?":
+        if sistolica_list[2] in not_digits:
             sistolica_list[2] = "5"
 
-        if diastolica_list[0] == "?":
+        if diastolica_list[0] in not_digits:
             diastolica_list[0] = "7"
-        if diastolica_list[1] == "?":
+        if diastolica_list[1] in not_digits:
             diastolica_list[1] = "6"
 
-        if pulso_list[0] == "?" and len(pulso_list) == 2:
+        if pulso_list[0] in not_digits and len(pulso_list) == 2:
             pulso_list[0] = "7"
-        if pulso_list[1] == "?" and len(pulso_list) == 2:
+        if pulso_list[1] in not_digits and len(pulso_list) == 2:
             pulso_list[1] = "5"
         
 
