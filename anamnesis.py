@@ -43,6 +43,7 @@ LLM_ENOUGH = "I got enough info"
 LLM_END_PAYLOAD = "End session"
 FW_FAIL_PAYLOAD = "FW:ERR"
 LLM_FAIL_PAYLOAD = "failed"
+LLM_NULL_PAYLOAD = "N/A"
 
 class Forms(Enum):
     NAME = (0, "name", "Hi, I am Anna, I'm a virtual assistant and I'm here to collect some information to speed up your check-in. Please, answer my questions and follow my instructions. Tell me, What is your name?")
@@ -115,25 +116,20 @@ class SessionState:
                 "name": "Luis Inacio",
                 "cpf": "11111111111",
                 "dateOfBirth": "2000-01-13T00:00:00Z",
-                "sex": "M"
+                "sex": None,
             },
-            "weight": 10,
-            "height": 99,
-            "heartRate": 66,
-            "systolicPressure": 12,
-            "diastolicPressure": 8,
-            "temperature": 36.5,
-            "oxygenSaturation": 98,
-            "occupation": "student",
+            "weight": None,
+            "height": None,
+            "heartRate": None,
+            "systolicPressure": None,
+            "diastolicPressure": None,
+            "temperature": None,
+            "oxygenSaturation": None,
+            "occupation": None,
             "medications": [],
-            "allergies": ["eggs"],
-            "diseases": ["dengue", "chikungunya"],
-            "interview": [
-                {
-                    "question": "What brings you here today?",
-                    "answer": "im feeling week"
-                }
-            ]
+            "allergies": [],
+            "diseases": [],
+            "interview": []
         }
         self.interview = []
         self.dinamic_context = interview_context
@@ -227,6 +223,8 @@ async def run_forms_flow(client, message, payload, Session):
         elif payload == LLM_END_PAYLOAD:
             #RESET ALL
             return False
+        if payload == LLM_NULL_PAYLOAD:
+            payload = None
         Session.jsonPost[Forms.get_by_index(Session.forms_state).name] = payload
         Session.forms_state += 1
         print('form state:', Session.forms_state)
@@ -464,7 +462,6 @@ def build_llm_prompt(message, Session):
     elif Session.main_state == State.MEASURES:
         question = Measures.get_by_index(Session.measures_state).speach
         prompt = (measure_context + "\n[Question]" + question + "\n[Patient]: "+ message)
-        print("prompt: " + prompt)
         return prompt
     elif Session.main_state == State.INTERVIEW:
         Session.dinamic_context += "\n[Patient]: " + message
@@ -496,11 +493,11 @@ def insert_cli(Session):
         height = 175
 
     meds_str = Session.jsonPost.get("MEDICATIONS")
-    medications = [med.strip() for med in meds_str.split(',')] if meds_str else None
+    medications = [med.strip() for med in meds_str.split(',')] if meds_str else []
     allergies_str = Session.jsonPost.get("ALLERGIES")
-    allergies = [allg.strip() for allg in allergies_str.split(',')] if allergies_str else None
+    allergies = [allg.strip() for allg in allergies_str.split(',')] if allergies_str else []
     diseases_str = Session.jsonPost.get("DISEASES")
-    diseases = [dis.strip() for dis in diseases_str.split(',')] if diseases_str else None
+    diseases = [dis.strip() for dis in diseases_str.split(',')] if diseases_str else []
     requestBody = {
         "patient": {
             "name": Session.jsonPost['patient'].get("name"),
