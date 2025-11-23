@@ -1,0 +1,27 @@
+[Unit]
+Description=anamnesis.py script
+
+# Informa que o servico deve esperar a rede ficar online
+# Remova esta linha se seu script nao usa internet
+After=network.target
+
+[Service]
+# O usuário 'pi' vai rodar o script
+User=pi
+Group=pi
+
+# 2. Edite o WorkingDirectory para a pasta RAIZ do seu projeto
+# É essencial para o script encontrar arquivos relativos
+WorkingDirectory=/home/pi/repo/anamnesis-totem
+Environment="PYTHONUNBUFFERED=1"
+# 3. Edite o ExecStart com os caminhos COMPLETOS
+#    (caminho para o python do venv) (caminho para o seu script .py)
+ExecStart=/home/pi/repo/anamnesis-totem/venv/bin/python3 /home/pi/repo/anamnesis-totem/anamnesis.py
+
+# Reinicia o servico automaticamente se ele falhar
+Restart=on-failure
+RestartSec=5
+
+[Install]
+# Inicia o servico no boot
+WantedBy=multi-user.target
