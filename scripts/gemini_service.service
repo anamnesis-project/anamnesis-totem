@@ -21,7 +21,7 @@ Environment="PYTHONUNBUFFERED=1"
 ExecStart=/home/pi/repo/anamnesis-totem/venv/bin/python3 /home/pi/repo/anamnesis-totem/gemini_service.py
 
 # Reinicia o servico automaticamente se ele falhar
-Restart=on-failure
+Restart=always
 RestartSec=5
 
 [Install]

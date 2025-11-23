@@ -50,8 +50,8 @@ class Forms(Enum):
     CPF = (1, "cpf", "What is your CPF?")
     AGE = (2, "age", "What is your day of birth?")
     SEX = (3, "sex", "What is your biological sex?")
-    HEIGHT = (4, "height", "What is your height in centimeters?")
-    WEIGHT = (5, "weight", "What is your weight in kilograms?")
+    HEIGHT = (4, "height", "What is your height?")
+    WEIGHT = (5, "weight", "What is your weight?")
     OCCUPATION = (6, "occupation", "What is your occupation?")
     MEDICATIONS = (7, "medications", "Are you taking any medications? If so, please list them.")
     ALLERGIES = (8, "allergies", "Do you have any known allergies? If so, please list them.")
@@ -224,8 +224,9 @@ async def run_forms_flow(client, message, payload, Session):
             #RESET ALL
             return False
         if payload == LLM_NULL_PAYLOAD:
-            payload = None
-        Session.jsonPost[Forms.get_by_index(Session.forms_state).name] = payload
+            Session.jsonPost[Forms.get_by_index(Session.forms_state).name] = None
+        else:
+            Session.jsonPost[Forms.get_by_index(Session.forms_state).name] = payload
         Session.forms_state += 1
         print('form state:', Session.forms_state)
         if Session.forms_state >= len(Forms): #LAST QUESTION
