@@ -76,10 +76,10 @@ class Forms(Enum):
                 return member
 
 class Measures(Enum):
-    TEMPERATURE = (0, "temperature", "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen. Tell me when you are ready")
-    OXYMETER = (1, "oxymeter", "Please, put your finger on the oxymeter as shown on the screen.")
-    PRESSURE_OPEN_DOOR = (2, "pressure", "Please, grab the cuff inside the totem and place it on your bare arm, and tell me when you are ready...")
-    PRESSURE_START_MONITOR = (3, "pressure", "Please put the cuff back in the cabinet and tell me when it is done")
+    TEMPERATURE = (0, "temperature", "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen. Tell me when it is done")
+    OXYMETER = (1, "oxymeter", "Put your finger on the oxymeter as shown on the screen.")
+    PRESSURE_OPEN_DOOR = (2, "pressure", "Grab the cuff inside the totem and place it on your bare arm, and tell when it is done.")
+    PRESSURE_START_MONITOR = (3, "pressure", "Put the cuff back inside and tell me when it is done.")
     PRESSURE_CLOSE_DOOR = (4, "pressure", "")
 
     @property
