@@ -3,6 +3,7 @@ import websockets
 import aiomqtt as mqtt
 import pyaudio
 import logging
+import json
 import os
 from dotenv import load_dotenv
 from ctypes import *
@@ -21,10 +22,8 @@ MIC_STOP = "voice/mic_stt/stop"
 TOPIC_TRANSCRIPTION = "voice/mic_stt/transcription"
 WEBSOCKET_URI = f"ws://{server_ip}/ws/stt" # f-string é mais limpo
 
-WEBSOCKET_URI = "ws://"+ server_ip +"/ws/stt"
-
-SAMPLE_RATE = 16000 #48000
-CHUNK_SIZE = 2048 #4096
+SAMPLE_RATE = 16000
+CHUNK_SIZE = 2048
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 
@@ -67,26 +66,44 @@ async def send_audio_async(websocket, stream, active_event):
         logging.info("Stopped sending audio chunks")
 
 
+
 async def receive_text_and_publish(websocket, mqtt_client, active_event):
     logging.info("Waiting for transcription...")
     try:
         async for message in websocket:
-            logging.info(f"<< Received transcription: {message}")
+            # O servidor manda uma string JSON, precisamos converter para dict
+            data = json.loads(message)
             
-            # Se a mensagem for válida, publica e encerra
-            if message:
-                await mqtt_client.publish(TOPIC_TRANSCRIPTION, message)
-                logging.info("Transcription published. Stopping session.")
-                break 
-            
+            # CASO 1: Resultado Parcial (O servidor ainda está "pensando")
+            if "partial" in data:
+                # Opcional: Se quiser ver o progresso no log, descomente abaixo
+                # logging.debug(f"Partial: {data['partial']}")
+                continue  # <--- O PULO DO GATO: Continua ouvindo, não para!
+
+            # CASO 2: Resultado Final (O servidor detectou fim de frase/silêncio)
+            if "text" in data:
+                texto_final = data["text"]
+                
+                # Às vezes o silêncio gera um texto vazio, ignoramos
+                if not texto_final:
+                    continue
+
+                logging.info(f"<< Received FINAL transcription: {texto_final}")
+                await mqtt_client.publish(TOPIC_TRANSCRIPTION, texto_final)
+                
+                # AGORA sim podemos parar, pois temos uma frase completa
+                logging.info("Stopping session after receiving full sentence.")
+                break
+
     except asyncio.CancelledError:
-        logging.info("Receive transcription task cancelled")
+        logging.info("Error: cancelled receiving transcription")
     except websockets.exceptions.ConnectionClosed as e:
-        logging.warning(f"STT server closed connection: {e.code}")
+        logging.info(f"STT server closed connection: {e.code}")
     except Exception as e:
         logging.error(f"Error receiving transcription: {e}")
     finally:
-        active_event.clear() # Garante que o loop de envio pare também
+        logging.info("Finished receiving transcription task")
+        active_event.clear() # Isso fará o envio de áudio parar também
 
 
 async def stt_session_manager(mqtt_client, stt_active_event):
