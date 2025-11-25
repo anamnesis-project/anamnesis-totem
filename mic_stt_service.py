@@ -19,8 +19,8 @@ TOPIC_TRANSCRIPTION = "voice/mic_stt/transcription" # Para onde vai o texto fina
 
 WEBSOCKET_URI = "ws://"+ server_ip +"/ws/stt"
 
-SAMPLE_RATE = 48000 #16000
-CHUNK_SIZE = 4096
+SAMPLE_RATE = 16000 #48000
+CHUNK_SIZE = 2048 #4096
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 

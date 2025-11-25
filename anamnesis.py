@@ -29,7 +29,7 @@ UI_RECEIVE = "ui/receive"
 TOPIC_CAM = "cam/input"
 CAM_OUTPUT = "cam/output"
 
-MAX_QUESTIONS = 5
+MAX_QUESTIONS = 8
 
 SPEAK_SUCCESS_PAYLOAD = "ok"
 STT_FAIL_PAYLOAD = 'failed'
@@ -78,7 +78,7 @@ class Forms(Enum):
 class Measures(Enum):
     TEMPERATURE = (0, "temperature", "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen. Tell me when it is done")
     OXYMETER = (1, "oxymeter", "Put your finger on the oxymeter as shown on the screen.")
-    PRESSURE_OPEN_DOOR = (2, "pressure", "Grab the cuff inside the totem and place it on your bare arm, and tell when it is done.")
+    PRESSURE_OPEN_DOOR = (2, "pressure", "Grab the cuff inside the totem and place it on your bare arm, and tell me when it is done.")
     PRESSURE_START_MONITOR = (3, "pressure", "Put the cuff back inside and tell me when it is done.")
     PRESSURE_CLOSE_DOOR = (4, "pressure", "")
 
