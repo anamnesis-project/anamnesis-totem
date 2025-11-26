@@ -38,9 +38,9 @@ MIC_START_PAYLOAD = "start"
 LLM_CONTINUE_PAYLOAD = 'Continue'
 
 FIRST_QUESTION = "What brings you here today?"
-END_SENTENCE = "Thanks for the information. You can leave now."
-REMOVE_FINGER = "Remove the finger from the oxymeter."
-LLM_ENOUGH = "I got enough info"
+END_SENTENCE = "Thank you for the information. You may leave now."
+REMOVE_FINGER = "Remove your finger from the oxymeter."
+LLM_ENOUGH = "I have got enough information."
 LLM_END_PAYLOAD = "End session"
 FW_FAIL_PAYLOAD = "FW:ERR"
 LLM_FAIL_PAYLOAD = "failed"
@@ -49,7 +49,7 @@ LLM_NULL_PAYLOAD = "N/A"
 class Forms(Enum):
     NAME = (0, "name", "Hi, I am Anna, I'm a virtual assistant and I'm here to collect some information to speed up your check-in. Please, answer my questions and follow my instructions. Tell me, What is your name?")
     CPF = (1, "cpf", "What is your CPF?")
-    AGE = (2, "age", "What is your day of birth?")
+    AGE = (2, "age", "What is your date of birth?")
     SEX = (3, "sex", "What is your biological sex?")
     HEIGHT = (4, "height", "What is your height?")
     WEIGHT = (5, "weight", "What is your weight?")
@@ -77,10 +77,10 @@ class Forms(Enum):
                 return member
 
 class Measures(Enum):
-    TEMPERATURE = (0, "temperature", "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen. Tell me when it is done")
-    OXYMETER = (1, "oxymeter", "Put your finger on the oxymeter as shown on the screen.")
-    PRESSURE_OPEN_DOOR = (2, "pressure", "Grab the cuff inside the totem and place it on your bare arm, and tell me when it is done.")
-    PRESSURE_START_MONITOR = (3, "pressure", "Put the cuff back inside and tell me when it is done.")
+    TEMPERATURE = (0, "temperature", "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen. Tell me when it is done.")
+    OXYMETER = (1, "oxymeter", "Next, we will measure your blood oxygen saturation. Please, Put your finger on the oxymeter as shown on the screen.")
+    PRESSURE_OPEN_DOOR = (2, "pressure", "Now for your blood pressure, please grab the cuff inside the totem and fit it snugly on your bare arm. Tell when it is done.")
+    PRESSURE_START_MONITOR = (3, "pressure", "Perfect. Now, put the cuff back inside and tell me when you are done.")
     PRESSURE_CLOSE_DOOR = (4, "pressure", "")
 
     @property
