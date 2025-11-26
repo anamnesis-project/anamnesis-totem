@@ -2,7 +2,9 @@ const ws = io();
 const app = document.getElementById("app");
 
 let currentView = "idle";
-let globalData = {};
+let globalData = {
+    mic: false,
+};
 
 const types = Object.freeze({
     STATE: "state",
@@ -114,30 +116,18 @@ async function loadView(name, msg) {
         document.getElementById("msg").textContent = msg;
     }
     currentView = name;
-    updateViewData();
+    updateViewData("mic");
     console.log("Loaded view:", name);
 }
 
-function updateViewData() {
-    switch (currentView) {
-        case "forms": {
-            
-            break;
-        }
-        case "temperature": {
-            
-            break;
-        }
-        case "oxygen": {
-            
-            break;
-        }
-        case "pressure": {
-            
-            break;
-        }
-        case "interview": {
-            
+function updateViewData(field) {
+    switch (field) {
+        case "mic": {
+            if (globalData.mic) {
+                document.getElementById("mic").style.visibility = "visible";
+            } else {
+                document.getElementById("mic").style.visibility = "hidden";
+            }
             break;
         }
         default: {
@@ -212,7 +202,7 @@ async function updateState(state, step, msg) {
 
 function updateData(field, value) {
     globalData["field"] = value;
-    updateViewData();
+    updateViewData(field);
 }
 
 function syncData(data) {

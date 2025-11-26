@@ -33,6 +33,38 @@ data = {
     "name": "Murilo Kenji Unten"
 }
 
+async def ui_send_state(client, state, msg, step=""):
+    payload = {
+        "type": "state",
+        "state": state,
+        "msg": msg,
+        "step": step
+    }
+    output_string = json.dumps(payload)
+    await client.publish(UI_SEND, output_string)
+
+async def ui_send_data(client, field, value):
+    payload = {
+        "type": "data",
+        "field": field,
+        "value": value,
+    }
+
+    output_string = json.dumps(payload)
+    await client.publish(UI_SEND, output_string)
+
+async def ui_start(client):
+    await ui_send_state(client, "forms", "What is your name?", "name")
+
+async def ui_cancel(client):
+    await ui_send_state(client, "idle", "")
+
+async def ui_mic_on(client):
+    await ui_send_data(client, "mic", True)
+
+async def ui_mic_off(client):
+    await ui_send_data(client, "mic", False)
+
 app = Flask(__name__, static_folder="ui")
 app.config['SECRET_KEY'] = 'totem_secret_key'
 
@@ -51,7 +83,7 @@ def static_file(path):
 def handle_connect():
     global current_state
     print("client connected")
-    send_sync({"asdf": "whatever"})
+    send_sync({ "mic": False })
     send_state(current_state, "")
 
 @socketio.on("disconnect")

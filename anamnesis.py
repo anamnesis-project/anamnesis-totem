@@ -1,6 +1,7 @@
 import asyncio
 import aiomqtt as mqtt
 from gemini_service import process_answer_context, interview_context, measure_context
+from ui_service import ui_send_state, ui_send_data, ui_start, ui_cancel, ui_mic_on, ui_mic_off
 from enum import Enum
 import json
 import logging
@@ -207,13 +208,14 @@ async def run_forms_flow(client, message, payload, Session):
             log.warning(f"Audio_player_service failed: '{payload}'")
             return False #???
         if Session.forms_state >= Forms.AGE.index:
-            await client.publish(MIC_START, MIC_START_PAYLOAD)
+            await mic_start(client)
             
     async def handle_transcription():
         if payload == STT_FAIL_PAYLOAD:
             log.warning(f"Mic_stt_service failed: '{payload}'")
             return False #???
         content = build_llm_prompt(payload, Session)
+        await ui_mic_off(client)
         await client.publish(TOPIC_PROMPT, content)
 
     async def handle_llm():
@@ -348,6 +350,7 @@ async def run_measures_flow(client, message, payload, Session):
             log.warning(f"Mic_stt_service failed: '{payload}'")
         else:
             prompt = build_llm_prompt(payload, Session)
+            await ui_mic_off(client)
             await client.publish(TOPIC_PROMPT, prompt)
 
     ###########################################################################################
@@ -356,7 +359,7 @@ async def run_measures_flow(client, message, payload, Session):
             await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
         else:
             log.warning(f"Unexpected start pressure monitor payload: '{payload}'")
-            await client.publish(MIC_START, MIC_START_PAYLOAD)
+            await mic_start(client)
         
     ###########################################################################################
     async def handle_speaker():
@@ -367,7 +370,7 @@ async def run_measures_flow(client, message, payload, Session):
                                       Measures.PRESSURE_OPEN_DOOR.index, 
                                       Measures.PRESSURE_START_MONITOR.index,
                                       Measures.PRESSURE_CLOSE_DOOR.index]: 
-            await client.publish(MIC_START, MIC_START_PAYLOAD)
+            await mic_start(client)
 
         if Session.measures_state == Measures.OXYMETER.index:
             await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
@@ -413,7 +416,7 @@ async def run_interview_flow(client, message, payload, Session):
         if payload != SPEAK_SUCCESS_PAYLOAD:
             log.warning(f"Audio_player_service falhou: '{payload}'")
             return False #???
-        await client.publish(MIC_START, MIC_START_PAYLOAD)
+        await mic_start(client)
             
     async def handle_transcription():
         if payload == STT_FAIL_PAYLOAD:
@@ -423,6 +426,7 @@ async def run_interview_flow(client, message, payload, Session):
         if len(Session.interview)/2 >= MAX_QUESTIONS:
             return await end_session(Session, client, persist=True)
         prompt = build_llm_prompt(payload, Session)
+        await ui_mic_off(client)
         await client.publish(TOPIC_PROMPT, prompt)
         return True #???
 
@@ -531,21 +535,9 @@ async def end_session(Session, client, persist):
     await client.publish(TOPIC_SPEAK, END_SENTENCE)
     await ui_cancel(client)
 
-async def ui_start(client):
-    await ui_send_state(client, "forms", "What is your name?", "name")
-
-async def ui_cancel(client):
-    await ui_send_state(client, "idle", "")
-
-async def ui_send_state(client, state, msg, step=""):
-    payload = {
-        "type": "state",
-        "state": state,
-        "msg": msg,
-        "step": step
-    }
-    output_string = json.dumps(payload)
-    await client.publish(UI_SEND, output_string)
+async def mic_start(client):
+    await client.publish(MIC_START, MIC_START_PAYLOAD)
+    await ui_mic_on(client)
 
 if __name__ == "__main__":
     try:
