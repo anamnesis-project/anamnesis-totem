@@ -87,7 +87,6 @@ form input[type="text"]:focus {
 #mic {
     padding: 1em;
     border-radius: 5%;
-    margin: 20px auto;
     background-color: #2bfb57;
 }
 
@@ -98,7 +97,7 @@ form input[type="text"]:focus {
 
 header {
     position: fixed;
-    top: 20px;
-    left: 30px;
+    bottom: 20px;
+    left: 20px;
     z-index: 1000;
 }

@@ -201,7 +201,8 @@ async function updateState(state, step, msg) {
 }
 
 function updateData(field, value) {
-    globalData["field"] = value;
+    globalData[field] = value;
+    console.log(globalData);
     updateViewData(field);
 }
 
