@@ -93,10 +93,13 @@ async def stt_session_manager(mqtt_client, stt_active_event):
             
         except asyncio.CancelledError:
             logging.info("STT session cancelled.")
+            stt_active_event.clear()
         except ConnectionRefusedError:
             logging.error(f"STT connection refused: {WEBSOCKET_URI}")
+            stt_active_event.clear()
         except Exception as e:
             logging.error(f"Unexpected error at STT service: {e}")
+            stt_active_event.clear()
         finally:
             if stream:
                 stream.stop_stream()
@@ -107,7 +110,7 @@ async def stt_session_manager(mqtt_client, stt_active_event):
                 logging.info("PyAudio ended.")
             
             logging.info("STT session ended, waiting on idle state")
-            stt_active_event.clear()
+            #stt_active_event.clear()
 
 async def handle_mqtt_commands(client, stt_active_event):
     logging.info(f"Listening topics: '{MIC_START}' and '{MIC_STOP}'")
