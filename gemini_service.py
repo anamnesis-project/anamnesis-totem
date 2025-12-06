@@ -45,10 +45,10 @@ async def async_generate_content(context_to_send: str) -> str:
                 return response.text.replace('*', '').strip()
             except Exception as e2:
                 logging.error(f"Error calling Gemini API with key 2: {e2}")
-                return "Error: Gemini API failed with both keys."
+                return "Please, repeat."
         else:
             logging.error(f"Unexpected Gemini API error (key 1): {e}")
-            return "Error calling Gemini API."
+            return "Please, repeat."
 
 async def main():
     try:
