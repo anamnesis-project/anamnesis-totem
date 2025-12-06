@@ -41,6 +41,7 @@ FIRST_QUESTION = "What brings you here today?"
 END_SENTENCE = "Thank you for the information. You may leave now."
 REMOVE_FINGER = "Remove your finger from the oxymeter."
 LLM_ENOUGH = "I have got enough information."
+REPEAT = "Please, repeat."
 LLM_END_PAYLOAD = "End session"
 FW_FAIL_PAYLOAD = "FW:ERR"
 LLM_FAIL_PAYLOAD = "failed"
@@ -359,7 +360,7 @@ async def run_measures_flow(client, message, payload, Session):
             await client.publish(FW_INPUT, Measures.get_by_index(Session.measures_state).name)
         else:
             log.warning(f"Unexpected start pressure monitor payload: '{payload}'")
-            await mic_start(client)
+            await client.publish(TOPIC_SPEAK, REPEAT)
         
     ###########################################################################################
     async def handle_speaker():
@@ -390,6 +391,7 @@ async def run_measures_flow(client, message, payload, Session):
             Session.jsonPost["systolic_pressure"] = None
             Session.jsonPost["diastolic_pressure"] = None
             Session.jsonPost["heart_rate"] = None
+        await ui_send_state(client, "measures", speach, step)
         await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
         Session.measures_state += 1
 
