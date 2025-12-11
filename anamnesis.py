@@ -391,6 +391,8 @@ async def run_measures_flow(client, message, payload, Session):
             Session.jsonPost["systolic_pressure"] = None
             Session.jsonPost["diastolic_pressure"] = None
             Session.jsonPost["heart_rate"] = None
+        speach = Measures.get_by_index(Session.measures_state).speach
+        step = Measures.get_by_index(Session.measures_state).step
         await ui_send_state(client, "measures", speach, step)
         await client.publish(TOPIC_SPEAK, Measures.get_by_index(Session.measures_state).speach)
         Session.measures_state += 1
