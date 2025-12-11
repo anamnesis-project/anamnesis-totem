@@ -1,7 +1,7 @@
 import asyncio
 import aiomqtt as mqtt
 from gemini_service import process_answer_context, interview_context, measure_context
-from ui_service import ui_send_state, ui_send_data, ui_start, ui_cancel, ui_mic_on, ui_mic_off
+from ui_service import ui_send_state, ui_start, ui_cancel, ui_mic_on, ui_mic_off
 from enum import Enum
 import json
 import logging
@@ -24,7 +24,7 @@ TOPIC_SPEAK = "voice/speak/request"
 SPEAK_RESPONSE = "voice/speak/response"
 MIC_START = "voice/mic_stt/start"
 MIC_STOP = "voice/mic_stt/stop"
-TOPIC_TRANSCRIPTION = "voice/mic_stt/transcription" 
+TOPIC_TRANSCRIPTION = "voice/mic_stt/transcription"
 UI_SEND = "ui/send"
 UI_RECEIVE = "ui/receive"
 TOPIC_CAM = "cam/input"
@@ -79,9 +79,9 @@ class Forms(Enum):
 
 class Measures(Enum):
     TEMPERATURE = (0, "temperature", "Now, we are measuring some vital signs. Please, place your forehead in front of the thermometer as shown on the screen. Tell me when it is done.")
-    OXYMETER = (1, "oxymeter", "Next, we will measure your blood oxygen saturation. Please, Put your finger on the oxymeter as shown on the screen.")
-    PRESSURE_OPEN_DOOR = (2, "pressure", "Now for your blood pressure, please grab the cuff inside the totem and fit it snugly on your bare arm. Tell when it is done.")
-    PRESSURE_START_MONITOR = (3, "pressure", "Perfect. Now, put the cuff back inside and tell me when you are done.")
+    OXYMETER = (1, "oxymeter", "Next, we will measure your blood oxygen levels. Please, put your finger on the oxymeter as shown on the screen.")
+    PRESSURE_OPEN_DOOR = (2, "pressure", "Now for your blood pressure, grab the cuff inside the totem and fit it snugly on your bare arm. Tell me when it is done.")
+    PRESSURE_START_MONITOR = (3, "pressure", "Perfect. Put the cuff back inside and tell me when it is done.")
     PRESSURE_CLOSE_DOOR = (4, "pressure", "")
 
     @property
@@ -279,7 +279,7 @@ async def run_measures_flow(client, message, payload, Session):
                 try:
                     parts = payload.split(':')
                     value = float(parts[2])
-                    Session.jsonPost["temperature"] = (value + 6.2)
+                    Session.jsonPost["temperature"] = (value + 4.2)
                     log.info(f"Temperature recorded: {value}°C")
                     Session.measures_state += 1
                     speach = Measures.get_by_index(Session.measures_state).speach

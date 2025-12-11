@@ -42,8 +42,8 @@ DIGITOS = {
 # Coordenadas fixas dos dígitos (x, y, w, h)
 digitos_coord = {
     "sistolica": [(202, 174, 35, 65), (243, 174, 35, 65), (287, 174, 35, 65)],
-    "diastolica": [(243, 241, 35, 65), (287, 243, 35, 65)],
-    "pulso": [(264, 316, 25, 48), (292, 315, 25, 48)]
+    "diastolica": [(243, 241, 35, 65), (285, 244, 35, 65)],
+    "pulso": [(264, 315, 25, 48), (292, 315, 25, 48)]
 }
 
 def ler_digito(dig_img, debug_img, x0, y0):
