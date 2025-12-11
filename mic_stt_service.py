@@ -72,24 +72,10 @@ async def receive_text_and_publish(websocket, mqtt_client, active_event):
     try:
         async for message in websocket:
             # O servidor manda uma string JSON, precisamos converter para dict
-            data = json.loads(message)
-            
+            if message:
             # CASO 1: Resultado Parcial (O servidor ainda está "pensando")
-            if "partial" in data:
-                # Opcional: Se quiser ver o progresso no log, descomente abaixo
-                # logging.debug(f"Partial: {data['partial']}")
-                continue  # <--- O PULO DO GATO: Continua ouvindo, não para!
-
-            # CASO 2: Resultado Final (O servidor detectou fim de frase/silêncio)
-            if "text" in data:
-                texto_final = data["text"]
-                
-                # Às vezes o silêncio gera um texto vazio, ignoramos
-                if not texto_final:
-                    continue
-
-                logging.info(f"<< Received FINAL transcription: {texto_final}")
-                await mqtt_client.publish(TOPIC_TRANSCRIPTION, texto_final)
+                logging.info(f"<< Received FINAL transcription: {message}")
+                await mqtt_client.publish(TOPIC_TRANSCRIPTION, message)
                 
                 # AGORA sim podemos parar, pois temos uma frase completa
                 logging.info("Stopping session after receiving full sentence.")

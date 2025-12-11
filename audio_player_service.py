@@ -6,8 +6,8 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-#server_path = os.environ.get('SERVER_PATH')
-server_path = "192.168.18.47:8000"
+server_path = os.environ.get('SERVER_PATH')
+#server_path = "192.168.18.47:8000"
 
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
